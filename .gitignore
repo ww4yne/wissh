@@ -1,0 +1,12 @@
+.DS_Store
+.local/
+.claude/
+.playwright-mcp/
+.worktrees/
+/AGENTS.md
+DerivedData/
+build/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/

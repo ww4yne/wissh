@@ -1,0 +1,113 @@
+name: Remux
+options:
+  bundleIdPrefix: dev.remux
+  deploymentTarget:
+    iOS: "18.0"
+  postGenCommand: >-
+    /usr/bin/perl -0pi -e 's/lastKnownFileType = wrapper\.icon;/lastKnownFileType = folder.iconcomposer.icon;/g' Remux.xcodeproj/project.pbxproj
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: dev.remux.app
+    PRODUCT_NAME: Remux
+    MARKETING_VERSION: 0.1.0
+    CURRENT_PROJECT_VERSION: 12
+    SWIFT_VERSION: 6.0
+    IPHONEOS_DEPLOYMENT_TARGET: 18.0
+    TARGETED_DEVICE_FAMILY: 1
+    SUPPORTS_MACCATALYST: NO
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
+    OTHER_LDFLAGS:
+      - -lc++
+packages:
+  Citadel:
+    url: https://github.com/h3nock/Citadel.git
+    revision: 0697b32db78dab5adaae5aaba1d2749838986a26
+targets:
+  Remux:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: RemuxApp/Sources
+      - path: RemuxApp/Assets.xcassets
+      - path: RemuxApp/Remux.icon
+      - path: RemuxApp/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      - path: RemuxApp/Resources/install_authorized_key.sh
+        buildPhase: resources
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: Remux
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        TARGETED_DEVICE_FAMILY: "1"
+    preBuildScripts:
+      - name: Verify GhosttyKit release mode
+        basedOnDependencyAnalysis: false
+        script: |
+          "$SRCROOT/scripts/verify_ghosttykit_release_mode.sh"
+    dependencies:
+      - framework: ../ghostty-remux-upstream-rebuild/macos/GhosttyKit.xcframework
+        embed: false
+      - package: Citadel
+    info:
+      path: RemuxApp/Info.plist
+      properties:
+        CFBundleDisplayName: Remux
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: Remux uses the microphone so you can dictate messages.
+        NSSpeechRecognitionUsageDescription: Remux uses on-device speech recognition to turn your dictation into text.
+        UILaunchScreen: {}
+        UIApplicationSupportsIndirectInputEvents: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+  RemuxTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: RemuxAppTests
+    dependencies:
+      - target: Remux
+      - framework: ../ghostty-remux-upstream-rebuild/macos/GhosttyKit.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.remux.appTests
+        PRODUCT_NAME: RemuxTests
+        PRODUCT_MODULE_NAME: RemuxTests
+        GENERATE_INFOPLIST_FILE: YES
+  RemuxUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: RemuxAppUITests
+    dependencies:
+      - target: Remux
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.remux.appUITests
+        PRODUCT_NAME: RemuxUITests
+        PRODUCT_MODULE_NAME: RemuxUITests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  RemuxUIOnly:
+    build:
+      targets:
+        Remux: all
+        RemuxUITests: [test]
+    test:
+      targets:
+        - RemuxUITests
+  Remux:
+    build:
+      targets:
+        Remux: all
+        RemuxTests: [test]
+    test:
+      targets:
+        - RemuxTests

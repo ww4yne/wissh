@@ -1,0 +1,143 @@
+{
+  "color-space-for-untagged-svg-colors": "display-p3",
+  "fill": {
+    "linear-gradient": [
+      "display-p3:0.04314,0.09020,0.07843,1.00000",
+      "display-p3:0.01176,0.03137,0.02353,1.00000"
+    ]
+  },
+  "groups": [
+    {
+      "name": "Foreground Details",
+      "lighting": "individual",
+      "layers": [
+        {
+          "name": "cursor",
+          "image-name": "cursor.png",
+          "hidden": false,
+          "blend-mode": "normal",
+          "fill": "automatic",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "name": "live-signal",
+          "image-name": "live-dot.png",
+          "hidden": false,
+          "blend-mode": "normal",
+          "fill": "automatic",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.18
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    },
+    {
+      "name": "Active Glass Pane",
+      "lighting": "individual",
+      "layers": [
+        {
+          "name": "active-pane",
+          "image-name": "active-pane.png",
+          "hidden": false,
+          "blend-mode": "normal",
+          "fill": "automatic",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "layer-color",
+        "opacity": 0.14
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.28
+      }
+    },
+    {
+      "name": "Inactive Glass Panes",
+      "lighting": "individual",
+      "layers": [
+        {
+          "name": "inactive-panes",
+          "image-name": "inactive-panes.png",
+          "hidden": false,
+          "blend-mode": "normal",
+          "fill": "automatic",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.2
+      },
+      "translucency": {
+        "enabled": true,
+        "value": 0.18
+      }
+    },
+    {
+      "name": "Matte Terminal Field",
+      "lighting": "individual",
+      "layers": [
+        {
+          "name": "field",
+          "image-name": "field.png",
+          "hidden": false,
+          "blend-mode": "normal",
+          "fill": "automatic",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.08
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}
