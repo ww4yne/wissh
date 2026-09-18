@@ -1,6 +1,6 @@
 # Overview
 
-Remux is an iOS app for remote tmux sessions.
+Wissh is an iPhone SSH and tmux client with first-class ProxyJump support.
 
 It keeps the app model close to tmux instead of treating tmux as one
 full-screen terminal attachment:

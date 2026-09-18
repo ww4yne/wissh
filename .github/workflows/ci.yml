@@ -26,7 +26,7 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
 
     steps:
-      - name: Check out Remux
+      - name: Check out Wissh
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
@@ -49,7 +49,7 @@ jobs:
           app_changed=false
           while IFS= read -r path; do
             case "${path}" in
-              remux-site/*|docs/*|README.md|LICENSE)
+              docs/*|README.md|LICENSE|UPSTREAM.md)
                 ;;
               *)
                 app_changed=true
@@ -60,28 +60,6 @@ jobs:
 
           printf 'app=%s\n' "${app_changed}" >> "${GITHUB_OUTPUT}"
 
-  site:
-    name: Site
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Check out Remux
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-
-      - name: Validate static site
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --check remux-site/script.js
-
-          while IFS= read -r asset; do
-            test -f "remux-site/${asset}" || {
-              printf 'Missing site asset: %s\n' "${asset}" >&2
-              exit 1
-            }
-          done < <(rg -o 'assets/[^"?]+' remux-site/index.html | sort -u)
-
   app:
     name: App
     needs: changes
@@ -90,7 +68,7 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - name: Check out Remux
+      - name: Check out Wissh
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Select Xcode
@@ -112,7 +90,7 @@ jobs:
           set -euo pipefail
           runtime_id="$(xcrun simctl list runtimes --json | jq -r '[.runtimes[] | select(.isAvailable == true and .platform == "iOS")] | sort_by(.version | split(".") | map(tonumber)) | last.identifier')"
           test -n "${runtime_id}"
-          udid="$(xcrun simctl create "Remux CI ${GITHUB_RUN_ID}" com.apple.CoreSimulator.SimDeviceType.iPhone-17e "${runtime_id}")"
+          udid="$(xcrun simctl create "Wissh CI ${GITHUB_RUN_ID}" com.apple.CoreSimulator.SimDeviceType.iPhone-17e "${runtime_id}")"
           printf 'udid=%s\n' "${udid}" >> "${GITHUB_OUTPUT}"
           xcrun simctl boot "${udid}"
 
@@ -142,7 +120,7 @@ jobs:
         run: |
           set -euo pipefail
           xcodegen generate
-          git diff --exit-code -- Remux.xcodeproj
+          git diff --exit-code -- Wissh.xcodeproj
 
       - name: Wait for simulator
         shell: bash
@@ -152,8 +130,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf "${RUNNER_TEMP}/RemuxUnitTests.xcresult"
-          xcodebuild test -project Remux.xcodeproj -scheme Remux -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" -only-testing:RemuxTests -resultBundlePath "${RUNNER_TEMP}/RemuxUnitTests.xcresult"
+          rm -rf "${RUNNER_TEMP}/WisshUnitTests.xcresult"
+          xcodebuild test -project Wissh.xcodeproj -scheme Wissh -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" -only-testing:WisshTests -resultBundlePath "${RUNNER_TEMP}/WisshUnitTests.xcresult"
 
       - name: Delete simulator
         if: always() && steps.simulator.outputs.udid != ''
@@ -164,7 +142,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: remux-test-results-${{ github.run_attempt }}
+          name: wissh-test-results-${{ github.run_attempt }}
           path: ${{ runner.temp }}/*.xcresult
           if-no-files-found: ignore
           retention-days: 7

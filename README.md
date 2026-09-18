@@ -9,9 +9,8 @@ preview, and localhost preview foundations.
 
 ## Status
 
-Wissh is in early development. The imported baseline still uses the Remux
-Xcode target and visual assets. The first milestone will establish the Wissh
-product identity and add a single-server ProxyJump experience.
+Wissh is in early development. The first milestone establishes the Wissh
+product identity before adding a single-server ProxyJump experience.
 
 ## Product direction
 
@@ -46,8 +45,8 @@ Generate the project and build:
 xcodegen generate
 
 xcodebuild build \
-  -project Remux.xcodeproj \
-  -scheme Remux \
+  -project Wissh.xcodeproj \
+  -scheme Wissh \
   -destination 'generic/platform=iOS Simulator'
 ```
 
@@ -55,13 +54,12 @@ Run the tests:
 
 ```bash
 xcodebuild test \
-  -project Remux.xcodeproj \
-  -scheme Remux \
+  -project Wissh.xcodeproj \
+  -scheme Wissh \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'
 ```
 
-The target and scheme names will change to `Wissh` during the branding
-milestone.
+The app, target, and scheme are named `Wissh`.
 
 ## Upstream and license
 

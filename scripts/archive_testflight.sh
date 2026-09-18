@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Archives Remux for App Store Connect and exports an .ipa ready for
+# Archives Wissh for App Store Connect and exports an .ipa ready for
 # TestFlight upload. Pass --upload to send it to App Store Connect through
 # the Apple ID signed into Xcode.
 
@@ -16,9 +16,9 @@ elif [[ -n "${1:-}" ]]; then
   exit 2
 fi
 
-archive_path=".local/archives/Remux-$(date +%Y%m%d-%H%M%S).xcarchive"
+archive_path=".local/archives/Wissh-$(date +%Y%m%d-%H%M%S).xcarchive"
 export_path=".local/archives/export-$(date +%Y%m%d-%H%M%S)"
-export_options="$(mktemp -t remux-export-options).plist"
+export_options="$(mktemp -t wissh-export-options).plist"
 
 destination="export"
 if [[ "$upload" -eq 1 ]]; then
@@ -43,8 +43,8 @@ PLIST
 mkdir -p .local/archives
 
 xcodebuild archive \
-  -project Remux.xcodeproj \
-  -scheme Remux \
+  -project Wissh.xcodeproj \
+  -scheme Wissh \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -archivePath "$archive_path" \

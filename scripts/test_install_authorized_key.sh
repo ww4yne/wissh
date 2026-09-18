@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-installer="RemuxApp/Resources/install_authorized_key.sh"
+installer="WisshApp/Resources/install_authorized_key.sh"
 test_root="$(mktemp -d)"
 
 cleanup() {

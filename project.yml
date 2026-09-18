@@ -1,14 +1,14 @@
-name: Remux
+name: Wissh
 options:
-  bundleIdPrefix: dev.remux
+  bundleIdPrefix: app.wissh
   deploymentTarget:
     iOS: "18.0"
   postGenCommand: >-
-    /usr/bin/perl -0pi -e 's/lastKnownFileType = wrapper\.icon;/lastKnownFileType = folder.iconcomposer.icon;/g' Remux.xcodeproj/project.pbxproj
+    /usr/bin/perl -0pi -e 's/lastKnownFileType = wrapper\.icon;/lastKnownFileType = folder.iconcomposer.icon;/g' Wissh.xcodeproj/project.pbxproj
 settings:
   base:
-    PRODUCT_BUNDLE_IDENTIFIER: dev.remux.app
-    PRODUCT_NAME: Remux
+    PRODUCT_BUNDLE_IDENTIFIER: app.wissh.ios
+    PRODUCT_NAME: Wissh
     MARKETING_VERSION: 0.1.0
     CURRENT_PROJECT_VERSION: 12
     SWIFT_VERSION: 6.0
@@ -23,21 +23,20 @@ packages:
     url: https://github.com/h3nock/Citadel.git
     revision: 0697b32db78dab5adaae5aaba1d2749838986a26
 targets:
-  Remux:
+  Wissh:
     type: application
     platform: iOS
     deploymentTarget: "18.0"
     sources:
-      - path: RemuxApp/Sources
-      - path: RemuxApp/Assets.xcassets
-      - path: RemuxApp/Remux.icon
-      - path: RemuxApp/PrivacyInfo.xcprivacy
+      - path: WisshApp/Sources
+      - path: WisshApp/Assets.xcassets
+      - path: WisshApp/PrivacyInfo.xcprivacy
         buildPhase: resources
-      - path: RemuxApp/Resources/install_authorized_key.sh
+      - path: WisshApp/Resources/install_authorized_key.sh
         buildPhase: resources
     settings:
       base:
-        ASSETCATALOG_COMPILER_APPICON_NAME: Remux
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         TARGETED_DEVICE_FAMILY: "1"
     preBuildScripts:
@@ -50,64 +49,64 @@ targets:
         embed: false
       - package: Citadel
     info:
-      path: RemuxApp/Info.plist
+      path: WisshApp/Info.plist
       properties:
-        CFBundleDisplayName: Remux
+        CFBundleDisplayName: Wissh
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
-        NSMicrophoneUsageDescription: Remux uses the microphone so you can dictate messages.
-        NSSpeechRecognitionUsageDescription: Remux uses on-device speech recognition to turn your dictation into text.
+        NSMicrophoneUsageDescription: Wissh uses the microphone so you can dictate messages.
+        NSSpeechRecognitionUsageDescription: Wissh uses on-device speech recognition to turn your dictation into text.
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-  RemuxTests:
+  WisshTests:
     type: bundle.unit-test
     platform: iOS
     deploymentTarget: "18.0"
     sources:
-      - path: RemuxAppTests
+      - path: WisshAppTests
     dependencies:
-      - target: Remux
+      - target: Wissh
       - framework: ../ghostty-remux-upstream-rebuild/macos/GhosttyKit.xcframework
         embed: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.remux.appTests
-        PRODUCT_NAME: RemuxTests
-        PRODUCT_MODULE_NAME: RemuxTests
+        PRODUCT_BUNDLE_IDENTIFIER: app.wissh.ios.tests
+        PRODUCT_NAME: WisshTests
+        PRODUCT_MODULE_NAME: WisshTests
         GENERATE_INFOPLIST_FILE: YES
-  RemuxUITests:
+  WisshUITests:
     type: bundle.ui-testing
     platform: iOS
     deploymentTarget: "18.0"
     sources:
-      - path: RemuxAppUITests
+      - path: WisshAppUITests
     dependencies:
-      - target: Remux
+      - target: Wissh
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.remux.appUITests
-        PRODUCT_NAME: RemuxUITests
-        PRODUCT_MODULE_NAME: RemuxUITests
+        PRODUCT_BUNDLE_IDENTIFIER: app.wissh.ios.ui-tests
+        PRODUCT_NAME: WisshUITests
+        PRODUCT_MODULE_NAME: WisshUITests
         GENERATE_INFOPLIST_FILE: YES
 schemes:
-  RemuxUIOnly:
+  WisshUIOnly:
     build:
       targets:
-        Remux: all
-        RemuxUITests: [test]
+        Wissh: all
+        WisshUITests: [test]
     test:
       targets:
-        - RemuxUITests
-  Remux:
+        - WisshUITests
+  Wissh:
     build:
       targets:
-        Remux: all
-        RemuxTests: [test]
+        Wissh: all
+        WisshTests: [test]
     test:
       targets:
-        - RemuxTests
+        - WisshTests
