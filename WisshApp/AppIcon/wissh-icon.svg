@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1024"
+     height="1024"
+     viewBox="0 0 1024 1024"
+     role="img"
+     aria-labelledby="title description">
+  <title id="title">Wissh app icon</title>
+  <desc id="description">
+    Four white panes on black with a spaced terminal prompt cut from the lower half
+    of the lower-right pane.
+  </desc>
+  <rect width="1024" height="1024" fill="#050505"/>
+  <g fill="#fff">
+    <rect x="164" y="164" width="330" height="330"/>
+    <rect x="530" y="164" width="330" height="330"/>
+    <rect x="164" y="530" width="330" height="330"/>
+    <rect x="530" y="530" width="330" height="330"/>
+  </g>
+  <g fill="none"
+     stroke="#050505"
+     stroke-width="38"
+     stroke-linecap="square"
+     stroke-linejoin="miter">
+    <path d="M584 724 L646 770 L584 816"/>
+    <path d="M706 816 H800"/>
+  </g>
+</svg>

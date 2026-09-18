@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Downloads the prebuilt ReleaseFast GhosttyKit.xcframework release asset and
-# places it at the path configured in project.yml, so building Remux does not
+# places it at the path configured in project.yml, so building Wissh does not
 # require Zig or a Ghostty checkout.
 
 release_tag="ghosttykit-20260815"

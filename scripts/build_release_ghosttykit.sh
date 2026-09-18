@@ -7,7 +7,7 @@ xcframework="$ghostty_root/macos/GhosttyKit.xcframework"
 
 if [[ ! -f "$ghostty_root/build.zig" ]]; then
   printf 'Ghostty source checkout not found at %s\n' "$ghostty_root" >&2
-  printf 'Set GHOSTTY_SOURCE_DIR to the checkout consumed by Remux.\n' >&2
+  printf 'Set GHOSTTY_SOURCE_DIR to the checkout consumed by Wissh.\n' >&2
   exit 2
 fi
 

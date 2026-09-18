@@ -13,7 +13,7 @@ library="$macos_slice/ghostty-internal.a"
 
 if [[ ! -f "$headers/ghostty.h" || ! -f "$library" ]]; then
   printf 'Release builds require a complete GhosttyKit XCFramework at %s\n' "$xcframework" >&2
-  printf 'Run scripts/build_release_ghosttykit.sh before building Remux Release.\n' >&2
+  printf 'Run scripts/build_release_ghosttykit.sh before building Wissh Release.\n' >&2
   exit 2
 fi
 
@@ -58,10 +58,10 @@ case "$actual_mode" in
 esac
 
 if [[ "$actual_mode" != "2" ]]; then
-  printf 'Remux Release requires ReleaseFast GhosttyKit; detected %s at %s\n' \
+  printf 'Wissh Release requires ReleaseFast GhosttyKit; detected %s at %s\n' \
     "$actual_name" \
     "$xcframework" >&2
-  printf 'Run scripts/build_release_ghosttykit.sh before building or profiling Remux Release.\n' >&2
+  printf 'Run scripts/build_release_ghosttykit.sh before building or profiling Wissh Release.\n' >&2
   exit 1
 fi
 

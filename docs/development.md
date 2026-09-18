@@ -1,6 +1,6 @@
 # Development
 
-Remux uses XcodeGen. The checked-in project definition is `project.yml`.
+Wissh uses XcodeGen. The checked-in project definition is `project.yml`.
 
 ## Requirements
 
@@ -18,7 +18,7 @@ scripts/build_release_ghosttykit.sh
 ```
 
 Set `GHOSTTY_SOURCE_DIR` when the Ghostty checkout is not the configured
-sibling directory. The script always builds `ReleaseFast`, and Remux Release
+sibling directory. The script always builds `ReleaseFast`, and Wissh Release
 builds independently query the resulting XCFramework and fail on any other
 mode. The app also validates the selected iOS slice at launch.
 
@@ -34,8 +34,8 @@ Run this after changing [project.yml](../project.yml).
 
 ```bash
 xcodebuild build \
-  -project Remux.xcodeproj \
-  -scheme Remux \
+  -project Wissh.xcodeproj \
+  -scheme Wissh \
   -destination 'generic/platform=iOS Simulator'
 ```
 
@@ -43,8 +43,8 @@ xcodebuild build \
 
 ```bash
 xcodebuild test \
-  -project Remux.xcodeproj \
-  -scheme Remux \
+  -project Wissh.xcodeproj \
+  -scheme Wissh \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'
 ```
 
@@ -61,13 +61,13 @@ bundles, or generated build products.
 Debug builds can seed one saved connection from launch environment variables.
 
 ```bash
-REMUX_DEBUG_SEED_CONNECTION=1
-REMUX_DEBUG_SERVER_NAME="Example Server"
-REMUX_DEBUG_SERVER_HOST="server.example.com"
-REMUX_DEBUG_SERVER_PORT=22
-REMUX_DEBUG_SERVER_USERNAME="demo"
-REMUX_DEBUG_SERVER_PASSWORD="<password>"
-REMUX_DEBUG_TMUX_SESSION="base"
+WISSH_DEBUG_SEED_CONNECTION=1
+WISSH_DEBUG_SERVER_NAME="Example Server"
+WISSH_DEBUG_SERVER_HOST="server.example.com"
+WISSH_DEBUG_SERVER_PORT=22
+WISSH_DEBUG_SERVER_USERNAME="demo"
+WISSH_DEBUG_SERVER_PASSWORD="<password>"
+WISSH_DEBUG_TMUX_SESSION="base"
 ```
 
 Live validation should stay opt-in and local. Keep any real host, username,
@@ -79,6 +79,6 @@ app runs with ephemeral debug storage, the test records the exact disposable
 allowlisted sessions after the run:
 
 ```bash
-scripts/remux_live_ui_test_with_cleanup.sh \
-  --only-testing RemuxUITests/RemuxAppUITests/testLiveSSHTmuxActionCycleWhenConfigured
+scripts/wissh_live_ui_test_with_cleanup.sh \
+  --only-testing WisshUITests/WisshAppUITests/testLiveSSHTmuxActionCycleWhenConfigured
 ```
