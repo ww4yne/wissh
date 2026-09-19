@@ -415,6 +415,7 @@ final class RemuxRootModelTests: XCTestCase {
                 showsServerSummaryForNewSession: false,
                 onChange: { _ in },
                 onConnect: {},
+                importProxyJumpIdentity: { _, _ in throw CancellationError() },
                 publicKeyInstallTarget: { _ in throw CancellationError() },
                 preflightPublicKeyInstallation: { _ in .passwordRequired },
                 appendPublicKey: { _, _ in },
@@ -618,6 +619,37 @@ final class RemuxRootModelTests: XCTestCase {
 
         XCTAssertEqual(harness.model.state, .library)
         XCTAssertEqual(try loadTrustedHostIdentities(root: harness.trustedHostRoot), [])
+    }
+
+    func testImportPrivateKeyIdentityPersistsCredentialAndReusesFingerprint() async throws {
+        let harness = makeHarness()
+        await harness.model.load()
+        let generatedKey = SSHPrivateKeyInspector.generateEd25519()
+        let credential = SSHPrivateKeyCredential(
+            privateKeyPEM: generatedKey.privateKeyPEM,
+            passphrase: nil
+        )
+
+        let imported = try await harness.model.importPrivateKeyIdentity(
+            name: "Jump key",
+            credential: credential
+        )
+        let reused = try await harness.model.importPrivateKeyIdentity(
+            name: "Duplicate key",
+            credential: credential
+        )
+
+        XCTAssertEqual(reused.id, imported.id)
+        XCTAssertEqual(imported.name, "Jump key")
+        XCTAssertEqual(imported.publicFingerprint, generatedKey.publicFingerprint)
+        let snapshot = try await harness.profileRepository.loadSnapshot()
+        XCTAssertEqual(snapshot.identities, [imported])
+        let credentials = await harness.credentialStore.credentialsSnapshot()
+        guard case .privateKey(let persistedCredential) = credentials[imported.id] else {
+            return XCTFail("Expected imported private-key credential.")
+        }
+        XCTAssertEqual(persistedCredential.privateKeyPEM, generatedKey.privateKeyPEM)
+        XCTAssertNil(persistedCredential.passphrase)
     }
 
     func testNewServerRejectsCallbacksFromCancelledSetupSession() async throws {

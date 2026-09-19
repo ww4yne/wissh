@@ -554,6 +554,44 @@ final class RemuxRootModel: ObservableObject {
         connectionSetup = setup
     }
 
+    func importPrivateKeyIdentity(
+        name: String,
+        credential: SSHPrivateKeyCredential
+    ) async throws -> SSHIdentity {
+        let inspection = try SSHPrivateKeyInspector.inspect(credential.privateKeyPEM)
+        if let existingIdentity = library.identities.first(where: {
+            $0.authenticationKind == .privateKey &&
+                $0.publicFingerprint == inspection.publicFingerprint
+        }) {
+            return existingIdentity
+        }
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let identity = SSHIdentity(
+            name: trimmedName.isEmpty ? "\(inspection.keyType.displayName) key" : trimmedName,
+            authenticationKind: .privateKey,
+            publicFingerprint: inspection.publicFingerprint
+        )
+        let normalizedCredential = SSHPrivateKeyCredential(
+            privateKeyPEM: inspection.normalizedPEM,
+            passphrase: credential.passphrase
+        )
+
+        try await dependencies.credentialStore.saveCredential(
+            .privateKey(normalizedCredential),
+            identityID: identity.id
+        )
+        do {
+            try await dependencies.profileRepository.saveIdentity(identity)
+            updateLibrary(try await dependencies.profileRepository.loadSnapshot())
+            return identity
+        } catch {
+            try? await dependencies.profileRepository.deleteIdentity(id: identity.id)
+            try? await dependencies.credentialStore.deleteCredential(identityID: identity.id)
+            throw error
+        }
+    }
+
     func dismissSetupSubmissionIssue(
         _ issue: ConnectionSetupState.SubmissionIssue
     ) {

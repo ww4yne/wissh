@@ -46,6 +46,69 @@ final class WisshAppUITests: XCTestCase {
         _ = waitForTerminalHomeButton()
     }
 
+    @MainActor
+    func testNewServerUsesGenericPlaceholders() {
+        launchSimulatorApp()
+        openConnectionSetup()
+
+        XCTAssertEqual(
+            app.textFields["connection.name"].value as? String,
+            "My Server"
+        )
+        XCTAssertEqual(
+            app.textFields["connection.host"].value as? String,
+            "server.example.com"
+        )
+        XCTAssertEqual(
+            app.textFields["connection.username"].value as? String,
+            "username"
+        )
+
+        let proxyJumpToggle = app.switches["connection.proxy-jump.enabled"]
+        XCTAssertTrue(proxyJumpToggle.waitForExistence(timeout: 2))
+        XCTAssertTrue(proxyJumpToggle.isEnabled)
+        XCTAssertTrue(proxyJumpToggle.isHittable)
+        proxyJumpToggle
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5))
+            .tap()
+        let proxyJumpEnabled = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "value == '1'"),
+            object: proxyJumpToggle
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [proxyJumpEnabled], timeout: 5),
+            .completed
+        )
+
+        let proxyJumpHost = app.textFields["connection.proxy-jump.host"]
+        for _ in 0..<4 where !proxyJumpHost.exists {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(proxyJumpHost.waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            proxyJumpHost.value as? String,
+            "bastion.example.com"
+        )
+        let proxyJumpUsername = app.textFields["connection.proxy-jump.username"]
+        XCTAssertTrue(proxyJumpUsername.waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            proxyJumpUsername.value as? String,
+            "username"
+        )
+        let identityImport = app.buttons["connection.proxy-jump.identity-import"]
+        for _ in 0..<4 where !identityImport.exists {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(identityImport.waitForExistence(timeout: 2))
+        for _ in 0..<4 where !app.buttons["Private Key"].exists {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(app.buttons["Password"].exists)
+        XCTAssertTrue(app.buttons["Private Key"].exists)
+        XCTAssertFalse(app.buttons["Tailscale SSH"].exists)
+        attachScreenshot(named: "proxy-jump-custom-identity")
+    }
+
     func testToolbarKeysUpdateRetainedSimulatorTerminalAndFirstSlotOpensShortcuts() {
         launchSeededSimulatorTerminal()
 
@@ -750,78 +813,6 @@ final class WisshAppUITests: XCTestCase {
         XCTAssertTrue(app.buttons["connection.private-key.change"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.staticTexts["Ready"].exists)
         XCTAssertFalse(app.staticTexts["Add the public key to your server"].exists)
-    }
-
-    func testTailscaleAuthenticationIsExplicitAndHidesPassword() {
-        launchSimulatorApp()
-        openConnectionSetup()
-
-        selectAuthentication("Tailscale SSH")
-
-        let tailscaleInfo = app.descendants(matching: .any)["connection.authentication.tailscale-info"]
-        XCTAssertTrue(tailscaleInfo.waitForExistence(timeout: 2))
-        XCTAssertTrue(
-            waitForElementToDisappear(
-                app.secureTextFields["connection.password"],
-                timeout: 2
-            )
-        )
-        attachScreenshot(named: "tailscale-authentication-explicit")
-    }
-
-    func testTailscaleCheckOffersToOpenVerificationInBrowser() {
-        app.launchEnvironment["WISSH_UI_TEST_TAILSCALE_CHECK_BANNER"] =
-            "# Tailscale SSH requires an additional check.\n" +
-            "# To authenticate, visit: https://login.tailscale.com/a/5fb81378394f\n"
-        launchSimulatorApp()
-        openConnectionSetup()
-        fillTailscaleConnectionForm()
-
-        selectAuthentication("Tailscale SSH")
-        app.buttons["connection.save"].tap()
-
-        let alert = app.alerts["Verify Tailscale SSH"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 5))
-        let openBrowser = alert.buttons["Open Browser"]
-        XCTAssertTrue(openBrowser.isHittable)
-        attachScreenshot(named: "tailscale-check-verification")
-
-        openBrowser.tap()
-
-        let browser = app.descendants(matching: .any)["tailscale-check.browser"]
-        XCTAssertTrue(
-            browser.waitForExistence(timeout: 5),
-            "Verification should open in an in-app browser instead of a universal-link handler."
-        )
-        XCTAssertTrue(browser.buttons["Done"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.state, .runningForeground)
-        attachScreenshot(named: "tailscale-check-browser")
-    }
-
-    func testTailscaleCheckCanCancelAndReturnToSetup() {
-        app.launchEnvironment["WISSH_UI_TEST_TAILSCALE_CHECK_BANNER"] =
-            "# Tailscale SSH requires an additional check.\n" +
-            "# To authenticate, visit: https://login.tailscale.com/a/5fb81378394f\n"
-        launchSimulatorApp()
-        openConnectionSetup()
-        fillTailscaleConnectionForm()
-
-        selectAuthentication("Tailscale SSH")
-        app.buttons["connection.save"].tap()
-
-        let alert = app.alerts["Verify Tailscale SSH"]
-        XCTAssertTrue(alert.waitForExistence(timeout: 5))
-        alert.buttons["Cancel Connection"].tap()
-
-        XCTAssertTrue(waitForElementToDisappear(alert, timeout: 2))
-        XCTAssertTrue(app.textFields["connection.name"].exists)
-        let save = app.buttons["connection.save"]
-        let saveEnabled = XCTNSPredicateExpectation(
-            predicate: NSPredicate(format: "exists == true AND enabled == true"),
-            object: save
-        )
-        XCTAssertEqual(XCTWaiter.wait(for: [saveEnabled], timeout: 2), .completed)
-        XCTAssertFalse(app.alerts["Couldn’t Add Server"].exists)
     }
 
     func testAlreadyInstalledPublicKeySkipsPasswordPrompt() {
@@ -3767,17 +3758,6 @@ final class WisshAppUITests: XCTestCase {
         password.typeText("demo-password")
 
         XCTAssertTrue(app.buttons["connection.save"].waitForExistence(timeout: 2))
-    }
-
-    private func fillTailscaleConnectionForm() {
-        app.textFields["connection.name"].tap()
-        app.textFields["connection.name"].typeText("Tailscale Server")
-
-        app.textFields["connection.host"].tap()
-        app.textFields["connection.host"].typeText("100.64.0.10")
-
-        app.textFields["connection.username"].tap()
-        app.textFields["connection.username"].typeText("demo\n")
     }
 
     private func selectAuthentication(_ name: String) {

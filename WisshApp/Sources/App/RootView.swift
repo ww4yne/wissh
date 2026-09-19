@@ -397,6 +397,12 @@ private struct RemuxWorkspaceShell: View {
             showsServerSummaryForNewSession: showsServerSummaryForNewSession,
             onChange: model.updateDraft,
             onConnect: onSave,
+            importProxyJumpIdentity: { name, credential in
+                try await model.importPrivateKeyIdentity(
+                    name: name,
+                    credential: credential
+                )
+            },
             publicKeyInstallTarget: { draft in
                 try model.publicKeyInstallTarget(for: draft)
             },
@@ -2202,6 +2208,11 @@ private struct SSHPublicKeyInstallRequest: Identifiable {
     let setupSessionID: UUID
 }
 
+private struct PendingProxyJumpIdentityImport {
+    let displayName: String
+    let inspection: SSHPrivateKeyInspection
+}
+
 struct ConnectionSetupView: View {
     let draft: TmuxConnectionDraft
     let validation: TmuxConnectionDraftValidation
@@ -2213,6 +2224,10 @@ struct ConnectionSetupView: View {
     let showsServerSummaryForNewSession: Bool
     let onChange: ((inout TmuxConnectionDraft) -> Void) -> Void
     let onConnect: () -> Void
+    let importProxyJumpIdentity: @MainActor (
+        String,
+        SSHPrivateKeyCredential
+    ) async throws -> SSHIdentity
     let publicKeyInstallTarget: (
         TmuxConnectionDraft
     ) throws -> SSHPublicKeyInstallTarget
@@ -2238,6 +2253,11 @@ struct ConnectionSetupView: View {
     }
 
     @State private var privateKeyImportError: String?
+    @State private var proxyJumpIdentityImportError: String?
+    @State private var pendingProxyJumpIdentityImport: PendingProxyJumpIdentityImport?
+    @State private var proxyJumpIdentityPassphrase = ""
+    @State private var isProxyJumpIdentityImporterPresented = false
+    @State private var isImportingProxyJumpIdentity = false
     @State private var publicKeyCopyMessage: String?
     @State private var publicKeyInstallRequest: SSHPublicKeyInstallRequest?
     @State private var publicKeyInstallConfirmation: SSHPublicKeyInstallConfirmation?
@@ -2248,8 +2268,8 @@ struct ConnectionSetupView: View {
             if showsEditableServerFields {
                 Section {
                     textInputRow(
-                        title: "Host",
-                        placeholder: "devbox",
+                        title: "Name",
+                        placeholder: "My Server",
                         keyPath: \.displayName,
                         field: .displayName,
                         validationMessage: validation.displayName,
@@ -2260,7 +2280,7 @@ struct ConnectionSetupView: View {
 
                     textInputRow(
                         title: "HostName",
-                        placeholder: "server.local or 100.64.0.10",
+                        placeholder: "server.example.com",
                         keyPath: \.host,
                         field: .host,
                         validationMessage: validation.host,
@@ -2282,7 +2302,7 @@ struct ConnectionSetupView: View {
 
                     textInputRow(
                         title: "User",
-                        placeholder: "macbook",
+                        placeholder: "username",
                         keyPath: \.username,
                         field: .username,
                         validationMessage: validation.username,
@@ -2301,12 +2321,14 @@ struct ConnectionSetupView: View {
 
                 Section {
                     Toggle("ProxyJump", isOn: proxyJumpBinding)
+                        .toggleStyle(.switch)
+                        .tint(LibraryHomePalette.controlAccent)
                         .accessibilityIdentifier("connection.proxy-jump.enabled")
 
                     if draft.usesProxyJump {
                         textInputRow(
                             title: "HostName",
-                            placeholder: "jump.example.com",
+                            placeholder: "bastion.example.com",
                             keyPath: \.proxyJumpHost,
                             field: .proxyJumpHost,
                             validationMessage: validation.proxyJumpHost,
@@ -2328,7 +2350,7 @@ struct ConnectionSetupView: View {
 
                         textInputRow(
                             title: "User",
-                            placeholder: "jump-user",
+                            placeholder: "username",
                             keyPath: \.proxyJumpUsername,
                             field: .proxyJumpUsername,
                             validationMessage: validation.proxyJumpUsername,
@@ -2342,7 +2364,64 @@ struct ConnectionSetupView: View {
                                 Text(identity.name).tag(SSHIdentity.ID?.some(identity.id))
                             }
                         }
-                            .accessibilityIdentifier("connection.proxy-jump.identity")
+                        .accessibilityIdentifier("connection.proxy-jump.identity")
+
+                        Button {
+                            dismissKeyboard()
+                            proxyJumpIdentityImportError = nil
+                            isProxyJumpIdentityImporterPresented = true
+                        } label: {
+                            Label("Import Custom Key…", systemImage: "key.horizontal")
+                        }
+                        .disabled(isImportingProxyJumpIdentity)
+                        .accessibilityIdentifier("connection.proxy-jump.identity-import")
+
+                        if let pendingProxyJumpIdentityImport {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(pendingProxyJumpIdentityImport.displayName)
+                                    .font(.footnote.weight(.semibold))
+                                Text(pendingProxyJumpIdentityImport.inspection.publicFingerprint)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+
+                                if pendingProxyJumpIdentityImport.inspection.isEncrypted {
+                                    SecureField(
+                                        "Key passphrase",
+                                        text: $proxyJumpIdentityPassphrase
+                                    )
+                                    .textContentType(.oneTimeCode)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .accessibilityIdentifier(
+                                        "connection.proxy-jump.identity-passphrase"
+                                    )
+                                }
+
+                                Button("Use Imported Key") {
+                                    persistPendingProxyJumpIdentity()
+                                }
+                                .disabled(
+                                    isImportingProxyJumpIdentity ||
+                                        (
+                                            pendingProxyJumpIdentityImport.inspection.isEncrypted &&
+                                            proxyJumpIdentityPassphrase.isEmpty
+                                        )
+                                )
+                                .accessibilityIdentifier(
+                                    "connection.proxy-jump.identity-confirm"
+                                )
+                            }
+                        }
+
+                        if let proxyJumpIdentityImportError {
+                            Text(proxyJumpIdentityImportError)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .accessibilityIdentifier(
+                                    "connection.proxy-jump.identity-error"
+                                )
+                        }
                     }
                 } header: {
                     Text("SSH Config")
@@ -2367,7 +2446,6 @@ struct ConnectionSetupView: View {
                     Picker("Method", selection: authenticationKindBinding) {
                         Text("Password").tag(SSHAuthenticationKind.password)
                         Text("Private Key").tag(SSHAuthenticationKind.privateKey)
-                        Text("Tailscale SSH").tag(SSHAuthenticationKind.none)
                     }
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("connection.authentication.method")
@@ -2378,7 +2456,9 @@ struct ConnectionSetupView: View {
                     case .privateKey:
                         privateKeyInputRows()
                     case .none:
-                        tailscaleAuthenticationRow()
+                        Text("Select Password or Private Key to update this server.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 } header: {
                     Text("Authentication")
@@ -2444,6 +2524,12 @@ struct ConnectionSetupView: View {
             allowedContentTypes: [.item],
             allowsMultipleSelection: false,
             onCompletion: handlePrivateKeyImport
+        )
+        .fileImporter(
+            isPresented: $isProxyJumpIdentityImporterPresented,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: false,
+            onCompletion: handleProxyJumpIdentityImport
         )
         .navigationDestination(isPresented: publicKeyInstallIsPresented) {
             if let request = publicKeyInstallRequest {
@@ -2789,23 +2875,6 @@ struct ConnectionSetupView: View {
         .onTapGesture {
             focusedField = .password
         }
-    }
-
-    private func tailscaleAuthenticationRow() -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label("Tailscale SSH", systemImage: "network")
-                .font(.footnote.weight(.semibold))
-
-            Text(
-                "Uses your tailnet identity without a password or key. " +
-                "If your SSH rule requires a check, Wissh will offer to open " +
-                "the verification link in your browser."
-            )
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 6)
-        .accessibilityIdentifier("connection.authentication.tailscale-info")
     }
 
     @ViewBuilder
@@ -3235,6 +3304,72 @@ struct ConnectionSetupView: View {
                 privateKeyImportError = error.localizedDescription
             } else {
                 privateKeyImportError = "Private key could not be imported."
+            }
+        }
+    }
+
+    private func handleProxyJumpIdentityImport(_ result: Result<[URL], Error>) {
+        do {
+            guard let url = try result.get().first else { return }
+            let hasScopedAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if hasScopedAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let data = try Data(contentsOf: url, options: .mappedIfSafe)
+            guard data.count <= SSHPrivateKeyInspector.maxByteCount else {
+                throw SSHPrivateKeyInspectionError.tooLarge
+            }
+            guard let pem = String(data: data, encoding: .utf8) else {
+                throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+            }
+
+            let inspection = try SSHPrivateKeyInspector.inspect(pem)
+            proxyJumpIdentityImportError = nil
+            proxyJumpIdentityPassphrase = ""
+            pendingProxyJumpIdentityImport = PendingProxyJumpIdentityImport(
+                displayName: url.lastPathComponent,
+                inspection: inspection
+            )
+            if !inspection.isEncrypted {
+                persistPendingProxyJumpIdentity()
+            }
+        } catch {
+            pendingProxyJumpIdentityImport = nil
+            proxyJumpIdentityImportError = (
+                error as? LocalizedError
+            )?.errorDescription ?? "Private key could not be imported."
+        }
+    }
+
+    private func persistPendingProxyJumpIdentity() {
+        guard let pendingProxyJumpIdentityImport else { return }
+        let passphrase = proxyJumpIdentityPassphrase.isEmpty
+            ? nil
+            : proxyJumpIdentityPassphrase
+        isImportingProxyJumpIdentity = true
+        Task { @MainActor in
+            defer { isImportingProxyJumpIdentity = false }
+            do {
+                let identity = try await importProxyJumpIdentity(
+                    pendingProxyJumpIdentityImport.displayName,
+                    SSHPrivateKeyCredential(
+                        privateKeyPEM: pendingProxyJumpIdentityImport.inspection.normalizedPEM,
+                        passphrase: passphrase
+                    )
+                )
+                onChange { draft in
+                    draft.proxyJumpIdentityID = identity.id
+                }
+                self.pendingProxyJumpIdentityImport = nil
+                proxyJumpIdentityPassphrase = ""
+                proxyJumpIdentityImportError = nil
+            } catch {
+                proxyJumpIdentityImportError = (
+                    error as? LocalizedError
+                )?.errorDescription ?? "Private key could not be saved."
             }
         }
     }
