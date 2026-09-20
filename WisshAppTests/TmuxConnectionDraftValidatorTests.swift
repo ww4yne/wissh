@@ -193,6 +193,52 @@ final class TmuxConnectionDraftValidatorTests: XCTestCase {
         }
     }
 
+    func testPsmuxDraftAcceptsCommandNameAndWindowsPath() {
+        for executable in [
+            "psmux.exe",
+            #"C:\Program Files\psmux\psmux.exe"#,
+        ] {
+            var draft = validServerDraft()
+            draft.multiplexer = .psmux
+            draft.tmuxExecutablePath = executable
+
+            let result = TmuxConnectionDraftValidator.validateServer(
+                draft,
+                existingServerID: nil
+            )
+
+            guard case .valid(let server) = result else {
+                XCTFail("expected valid psmux executable \(executable)")
+                continue
+            }
+            XCTAssertEqual(server.multiplexer, .psmux)
+            XCTAssertEqual(server.tmuxExecutablePath, executable)
+        }
+    }
+
+    func testPsmuxDraftRejectsControlCharacters() {
+        for executable in [
+            "psmux.exe\nwhoami",
+            "psmux.exe\rwhoami",
+            "psmux.exe\0whoami",
+        ] {
+            var draft = validServerDraft()
+            draft.multiplexer = .psmux
+            draft.tmuxExecutablePath = executable
+
+            let result = TmuxConnectionDraftValidator.validateServer(
+                draft,
+                existingServerID: nil
+            )
+
+            guard case .invalid(let validation) = result else {
+                XCTFail("expected invalid psmux executable \(executable.debugDescription)")
+                continue
+            }
+            XCTAssertNotNil(validation.tmuxExecutablePath)
+        }
+    }
+
     func testConnectionDraftLoadsSavedTmuxExecutablePathForEditing() {
         let server = SavedServer(
             displayName: "Laptop",
@@ -206,6 +252,23 @@ final class TmuxConnectionDraftValidatorTests: XCTestCase {
         let draft = TmuxConnectionDraft(server: server, workspace: workspace)
 
         XCTAssertEqual(draft.tmuxExecutablePath, "/opt/tmux/bin/tmux")
+    }
+
+    func testConnectionDraftLoadsSavedMultiplexerForEditing() {
+        let server = SavedServer(
+            displayName: "Windows",
+            host: "windows.example.com",
+            username: "demo",
+            identityID: UUID(),
+            multiplexer: .psmux,
+            tmuxExecutablePath: #"C:\Tools\psmux.exe"#
+        )
+
+        let workspace = SavedWorkspace(serverID: server.id, sessionName: "base")
+        let draft = TmuxConnectionDraft(server: server, workspace: workspace)
+
+        XCTAssertEqual(draft.multiplexer, .psmux)
+        XCTAssertEqual(draft.tmuxExecutablePath, #"C:\Tools\psmux.exe"#)
     }
 
     func testValidPrivateKeyDraftProducesPrivateKeyCredential() {

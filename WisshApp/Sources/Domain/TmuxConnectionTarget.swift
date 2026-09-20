@@ -141,6 +141,31 @@ struct ProxyJumpConfiguration: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
+enum TerminalMultiplexer: String, Codable, CaseIterable, Identifiable, Sendable {
+    case tmux
+    case psmux
+
+    var id: Self { self }
+
+    var displayName: String {
+        switch self {
+        case .tmux:
+            "tmux"
+        case .psmux:
+            "psmux"
+        }
+    }
+
+    var defaultExecutable: String {
+        switch self {
+        case .tmux:
+            "tmux"
+        case .psmux:
+            "psmux.exe"
+        }
+    }
+}
+
 struct SavedServer: Identifiable, Equatable, Codable, Sendable {
     let id: UUID
     var displayName: String
@@ -148,6 +173,7 @@ struct SavedServer: Identifiable, Equatable, Codable, Sendable {
     var port: Int
     var username: String
     var identityID: SSHIdentity.ID
+    var multiplexer: TerminalMultiplexer?
     var tmuxExecutablePath: String?
     var proxyJump: ProxyJumpConfiguration?
 
@@ -158,6 +184,7 @@ struct SavedServer: Identifiable, Equatable, Codable, Sendable {
         port: Int = 22,
         username: String,
         identityID: SSHIdentity.ID,
+        multiplexer: TerminalMultiplexer = .tmux,
         tmuxExecutablePath: String? = nil,
         proxyJump: ProxyJumpConfiguration? = nil
     ) {
@@ -167,8 +194,13 @@ struct SavedServer: Identifiable, Equatable, Codable, Sendable {
         self.port = port
         self.username = username
         self.identityID = identityID
+        self.multiplexer = multiplexer == .tmux ? nil : multiplexer
         self.tmuxExecutablePath = tmuxExecutablePath
         self.proxyJump = proxyJump
+    }
+
+    var resolvedMultiplexer: TerminalMultiplexer {
+        multiplexer ?? .tmux
     }
 }
 
@@ -447,6 +479,7 @@ struct TmuxConnectionDraft: Equatable, Sendable {
     var proxyJumpPort: String = "22"
     var proxyJumpUsername: String = ""
     var proxyJumpIdentityID: SSHIdentity.ID?
+    var multiplexer: TerminalMultiplexer = .tmux
     var tmuxExecutablePath: String = ""
     var authenticationKind: SSHAuthenticationKind = .password
     var password: String = ""
@@ -481,6 +514,7 @@ struct TmuxConnectionDraft: Equatable, Sendable {
                 ? nil
                 : proxyJump.identityID
         }
+        self.multiplexer = server.resolvedMultiplexer
         self.tmuxExecutablePath = server.tmuxExecutablePath ?? ""
         self.sessionName = workspace.sessionName
     }
@@ -567,6 +601,7 @@ struct ValidatedTmuxServerDraft: Equatable, Sendable {
     let port: Int
     let username: String
     let proxyJump: ValidatedProxyJumpDraft?
+    let multiplexer: TerminalMultiplexer
     let tmuxExecutablePath: String?
     let credential: Credential
 
@@ -578,6 +613,7 @@ struct ValidatedTmuxServerDraft: Equatable, Sendable {
             port: port,
             username: username,
             identityID: identityID,
+            multiplexer: multiplexer,
             tmuxExecutablePath: tmuxExecutablePath,
             proxyJump: proxyJump.map {
                 ProxyJumpConfiguration(
@@ -719,7 +755,7 @@ enum TmuxConnectionDraftValidator {
         }
 
         if let tmuxExecutablePath {
-            if !tmuxExecutablePath.hasPrefix("/") {
+            if draft.multiplexer == .tmux && !tmuxExecutablePath.hasPrefix("/") {
                 validation.tmuxExecutablePath = "Enter an absolute path beginning with /."
             } else if tmuxExecutablePath.contains("\n") ||
                         tmuxExecutablePath.contains("\r") ||
@@ -776,6 +812,7 @@ enum TmuxConnectionDraftValidator {
                 port: port,
                 username: username,
                 proxyJump: proxyJump,
+                multiplexer: draft.multiplexer,
                 tmuxExecutablePath: tmuxExecutablePath,
                 credential: credential
             )
@@ -791,7 +828,7 @@ enum TmuxConnectionDraftValidator {
         let sessionName = draft.sessionName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if sessionName.isEmpty {
-            validation.sessionName = "tmux session name is required."
+            validation.sessionName = "Session name is required."
         }
 
         guard validation.isValid else {

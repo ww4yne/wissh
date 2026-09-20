@@ -17,6 +17,22 @@ final class TmuxSessionDiscoveryTests: XCTestCase {
         XCTAssertFalse(command.contains("touch pwned"))
     }
 
+    func testPsmuxListCommandUsesEncodedPowerShell() throws {
+        let executable = #"C:\Program Files\psmux\psmux.exe"#
+
+        let command = SSHTmuxControlCommandBuilder.listSessionsCommand(
+            multiplexer: .psmux,
+            tmuxExecutable: executable
+        )
+
+        let encoded = try XCTUnwrap(command.split(separator: " ").last.map(String.init))
+        let data = try XCTUnwrap(Data(base64Encoded: encoded))
+        let script = try XCTUnwrap(String(data: data, encoding: .utf16LittleEndian))
+        XCTAssertFalse(command.contains(executable))
+        XCTAssertFalse(script.contains(executable))
+        XCTAssertTrue(script.contains("& $resolved list-sessions -F '#{session_name}'"))
+    }
+
     func testParserPreservesWhitespaceDeduplicatesAndAcceptsCRLF() throws {
         let names = try TmuxSessionDiscovery.parseSessionNames(
             Data("main\r\n  spaced  \nmain\n\nops\r\n".utf8)

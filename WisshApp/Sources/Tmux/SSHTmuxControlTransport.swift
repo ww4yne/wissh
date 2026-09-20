@@ -15,6 +15,7 @@ struct SSHTmuxControlConfiguration: Sendable {
     let jump: OpenSSHProxyJumpConfiguration?
     let controlNoResponseTimeout: TimeAmount
     let sftpOperationTimeout: TimeAmount
+    let multiplexer: TerminalMultiplexer
     let tmuxExecutable: String
     let sessionName: String
     let initialViewport: TmuxControlViewport
@@ -32,6 +33,7 @@ struct SSHTmuxControlConfiguration: Sendable {
         jump: OpenSSHProxyJumpConfiguration? = nil,
         controlNoResponseTimeout: TimeAmount = .seconds(15),
         sftpOperationTimeout: TimeAmount = .seconds(15),
+        multiplexer: TerminalMultiplexer = .tmux,
         tmuxExecutable: String = "tmux",
         sessionName: String,
         initialViewport: TmuxControlViewport = .default,
@@ -48,6 +50,7 @@ struct SSHTmuxControlConfiguration: Sendable {
         self.jump = jump
         self.controlNoResponseTimeout = controlNoResponseTimeout
         self.sftpOperationTimeout = sftpOperationTimeout
+        self.multiplexer = multiplexer
         self.tmuxExecutable = tmuxExecutable
         self.sessionName = sessionName
         self.initialViewport = initialViewport
@@ -529,6 +532,7 @@ actor SSHTmuxControlTransport: TmuxControlTransport, TmuxControlTransportLivenes
 
     private func tmuxAttachCommand(viewport: TmuxControlViewport) -> String {
         SSHTmuxControlCommandBuilder.attachOrCreateControlSessionCommand(
+            multiplexer: configuration.multiplexer,
             tmuxExecutable: configuration.tmuxExecutable,
             sessionName: configuration.sessionName,
             initialViewport: viewport

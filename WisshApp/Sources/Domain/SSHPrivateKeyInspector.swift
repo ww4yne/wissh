@@ -67,6 +67,7 @@ struct SSHGeneratedPrivateKey: Equatable, Sendable {
 enum SSHPrivateKeyInspectionError: Error, Equatable, LocalizedError, Sendable {
     case empty
     case tooLarge
+    case legacyPEMFormat
     case invalidOpenSSHPrivateKey
     case unsupportedKeyType(String)
 
@@ -76,6 +77,8 @@ enum SSHPrivateKeyInspectionError: Error, Equatable, LocalizedError, Sendable {
             "Private key is required."
         case .tooLarge:
             "Private key file is too large."
+        case .legacyPEMFormat:
+            "This key uses legacy PEM format. Convert a copy with ssh-keygen -p -o, then import it again."
         case .invalidOpenSSHPrivateKey:
             "Import an OpenSSH private key."
         case .unsupportedKeyType(let keyType):
@@ -88,13 +91,21 @@ enum SSHPrivateKeyInspector {
     static let maxByteCount = 256 * 1024
 
     static func inspect(_ pem: String) throws -> SSHPrivateKeyInspection {
-        let normalizedPEM = pem.trimmingCharacters(in: .whitespacesAndNewlines)
+        var normalizedPEM = pem.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedPEM.isEmpty else {
             throw SSHPrivateKeyInspectionError.empty
         }
 
         guard normalizedPEM.utf8.count <= maxByteCount else {
             throw SSHPrivateKeyInspectionError.tooLarge
+        }
+
+        if normalizedPEM.hasPrefix("-----BEGIN RSA PRIVATE KEY-----") {
+            normalizedPEM = try convertLegacyRSAPrivateKey(normalizedPEM)
+        } else if normalizedPEM.hasPrefix("-----BEGIN EC PRIVATE KEY-----") ||
+            normalizedPEM.hasPrefix("-----BEGIN PRIVATE KEY-----") ||
+            normalizedPEM.hasPrefix("-----BEGIN ENCRYPTED PRIVATE KEY-----") {
+            throw SSHPrivateKeyInspectionError.legacyPEMFormat
         }
 
         let payload = try openSSHPrivateKeyPayload(from: normalizedPEM)
@@ -315,17 +326,7 @@ enum SSHPrivateKeyInspector {
         payload.writeSSHString(publicKeyBlob)
         payload.writeSSHString(privateBlock.data)
 
-        let base64 = payload.data.base64EncodedString()
-        let wrapped = stride(from: 0, to: base64.count, by: 70).map { offset in
-            let start = base64.index(base64.startIndex, offsetBy: offset)
-            let end = base64.index(start, offsetBy: min(70, base64.distance(from: start, to: base64.endIndex)))
-            return String(base64[start..<end])
-        }.joined(separator: "\n")
-        let privateKeyPEM = """
-        -----BEGIN OPENSSH PRIVATE KEY-----
-        \(wrapped)
-        -----END OPENSSH PRIVATE KEY-----
-        """
+        let privateKeyPEM = openSSHPrivateKeyPEM(payload.data)
         let fingerprint = Data(SHA256.hash(data: publicKeyBlob))
             .base64EncodedString()
             .replacingOccurrences(of: "=", with: "")
@@ -355,6 +356,153 @@ enum SSHPrivateKeyInspector {
         }
 
         return payload
+    }
+
+    private static func convertLegacyRSAPrivateKey(_ pem: String) throws -> String {
+        let lines = pem
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard
+            lines.first == "-----BEGIN RSA PRIVATE KEY-----",
+            lines.last == "-----END RSA PRIVATE KEY-----",
+            lines.dropFirst().dropLast().allSatisfy({ !$0.contains(":") }),
+            let der = Data(base64Encoded: lines.dropFirst().dropLast().joined())
+        else {
+            throw SSHPrivateKeyInspectionError.legacyPEMFormat
+        }
+
+        var outerReader = DERReader(data: der)
+        let sequence = try outerReader.readElement(tag: 0x30)
+        guard outerReader.isAtEnd else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+
+        var keyReader = DERReader(data: sequence)
+        let version = try keyReader.readPositiveInteger()
+        guard version == Data([0]) else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+        let modulus = try keyReader.readPositiveInteger()
+        let publicExponent = try keyReader.readPositiveInteger()
+        let privateExponent = try keyReader.readPositiveInteger()
+        let prime1 = try keyReader.readPositiveInteger()
+        let prime2 = try keyReader.readPositiveInteger()
+        _ = try keyReader.readPositiveInteger()
+        _ = try keyReader.readPositiveInteger()
+        let coefficient = try keyReader.readPositiveInteger()
+        guard keyReader.isAtEnd else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+
+        var publicBlob = SSHPrivateKeyPayloadWriter()
+        publicBlob.writeSSHString(SSHPrivateKeyType.rsa.rawValue)
+        publicBlob.writeSSHString(publicExponent)
+        publicBlob.writeSSHString(modulus)
+
+        let checkBytes = SHA256.hash(data: der).prefix(4)
+        let check = checkBytes.reduce(UInt32(0)) { value, byte in
+            (value << 8) | UInt32(byte)
+        }
+        var privateBlock = SSHPrivateKeyPayloadWriter()
+        privateBlock.writeUInt32(check)
+        privateBlock.writeUInt32(check)
+        privateBlock.writeSSHString(SSHPrivateKeyType.rsa.rawValue)
+        privateBlock.writeSSHString(modulus)
+        privateBlock.writeSSHString(publicExponent)
+        privateBlock.writeSSHString(privateExponent)
+        privateBlock.writeSSHString(coefficient)
+        privateBlock.writeSSHString(prime1)
+        privateBlock.writeSSHString(prime2)
+        privateBlock.writeSSHString("")
+        privateBlock.writePadding(blockSize: 8)
+
+        var payload = SSHPrivateKeyPayloadWriter()
+        payload.writeBytes(Data("openssh-key-v1\0".utf8))
+        payload.writeSSHString("none")
+        payload.writeSSHString("none")
+        payload.writeSSHString(Data())
+        payload.writeUInt32(1)
+        payload.writeSSHString(publicBlob.data)
+        payload.writeSSHString(privateBlock.data)
+        return openSSHPrivateKeyPEM(payload.data)
+    }
+
+    private static func openSSHPrivateKeyPEM(_ payload: Data) -> String {
+        let base64 = payload.base64EncodedString()
+        let wrapped = stride(from: 0, to: base64.count, by: 70).map { offset in
+            let start = base64.index(base64.startIndex, offsetBy: offset)
+            let end = base64.index(
+                start,
+                offsetBy: min(70, base64.distance(from: start, to: base64.endIndex))
+            )
+            return String(base64[start..<end])
+        }.joined(separator: "\n")
+        return """
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        \(wrapped)
+        -----END OPENSSH PRIVATE KEY-----
+        """
+    }
+}
+
+private struct DERReader {
+    private let data: Data
+    private var offset = 0
+
+    init(data: Data) {
+        self.data = data
+    }
+
+    mutating func readElement(tag expectedTag: UInt8) throws -> Data {
+        guard offset < data.count, data[offset] == expectedTag else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+        offset += 1
+        let length = try readLength()
+        guard length <= data.count - offset else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+        let value = Data(data[offset..<(offset + length)])
+        offset += length
+        return value
+    }
+
+    mutating func readPositiveInteger() throws -> Data {
+        var integer = try readElement(tag: 0x02)
+        guard !integer.isEmpty, integer.first.map({ $0 & 0x80 == 0 }) == true else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+        while integer.count > 1, integer[0] == 0, integer[1] & 0x80 == 0 {
+            integer.removeFirst()
+        }
+        return integer
+    }
+
+    private mutating func readLength() throws -> Int {
+        guard offset < data.count else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+        let first = data[offset]
+        offset += 1
+        if first & 0x80 == 0 {
+            return Int(first)
+        }
+
+        let byteCount = Int(first & 0x7f)
+        guard byteCount > 0, byteCount <= 4, byteCount <= data.count - offset else {
+            throw SSHPrivateKeyInspectionError.invalidOpenSSHPrivateKey
+        }
+        var length = 0
+        for _ in 0..<byteCount {
+            length = (length << 8) | Int(data[offset])
+            offset += 1
+        }
+        return length
+    }
+
+    var isAtEnd: Bool {
+        offset == data.count
     }
 }
 

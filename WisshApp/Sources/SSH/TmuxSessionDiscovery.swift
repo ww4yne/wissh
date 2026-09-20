@@ -7,11 +7,11 @@ enum TmuxSessionDiscoveryError: Error, Equatable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidUTF8:
-            return "The tmux session list was not valid UTF-8."
+            return "The multiplexer session list was not valid UTF-8."
         case .remoteExit(let status, let stderr):
             let detail = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
             return detail.isEmpty
-                ? "tmux exited with status \(status)."
+                ? "The multiplexer exited with status \(status)."
                 : detail
         }
     }
@@ -20,12 +20,14 @@ enum TmuxSessionDiscoveryError: Error, Equatable, LocalizedError {
 enum TmuxSessionDiscovery {
     static func discover(
         using claimedRoot: RemuxSSHClaimedRoot,
+        multiplexer: TerminalMultiplexer,
         tmuxExecutable: String,
         trace: RemuxTransportStartupTrace
     ) async throws -> [String] {
         let result = try await RemuxSSHExecSession.run(
             using: claimedRoot,
             command: SSHTmuxControlCommandBuilder.listSessionsCommand(
+                multiplexer: multiplexer,
                 tmuxExecutable: tmuxExecutable
             ),
             stdin: nil,

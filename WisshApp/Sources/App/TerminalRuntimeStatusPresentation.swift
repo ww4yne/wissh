@@ -61,7 +61,7 @@ struct TerminalRuntimeStatusPresentation: Equatable, Sendable {
         case .profile:
             "Profile Error"
         case .tmuxUnavailable:
-            "tmux Error"
+            "Multiplexer Error"
         case .remoteExit:
             "Exited"
         case .runtime:

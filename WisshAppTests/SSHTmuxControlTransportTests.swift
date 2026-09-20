@@ -68,6 +68,7 @@ final class SSHTmuxControlTransportTests: XCTestCase {
         )
         XCTAssertNil(defaultConfiguration.traceFlowID)
         XCTAssertEqual(defaultConfiguration.controlNoResponseTimeout, .seconds(15))
+        XCTAssertEqual(defaultConfiguration.multiplexer, .tmux)
         XCTAssertEqual(defaultConfiguration.tmuxExecutable, "tmux")
 
         let tracedConfiguration = SSHTmuxControlConfiguration(
@@ -1369,6 +1370,34 @@ final class SSHTmuxControlTransportTests: XCTestCase {
         XCTAssertTrue(command.hasSuffix(" 120 40"))
     }
 
+    func testPsmuxControlSessionCommandUsesEncodedPowerShell() throws {
+        let executable = #"C:\Program Files\psmux\psmux.exe"#
+        let sessionName = "owner's bäse! back\\slash"
+        let command = SSHTmuxControlCommandBuilder.attachOrCreateControlSessionCommand(
+            multiplexer: .psmux,
+            tmuxExecutable: executable,
+            sessionName: sessionName,
+            initialViewport: TmuxControlViewport(
+                columns: 120,
+                rows: 40,
+                pixelWidth: 0,
+                pixelHeight: 0
+            )
+        )
+
+        let script = try decodePowerShellScript(command)
+        XCTAssertTrue(command.hasPrefix(
+            "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+        ))
+        XCTAssertFalse(command.contains(executable))
+        XCTAssertFalse(command.contains(sessionName))
+        XCTAssertTrue(script.contains(
+            "& $resolved -C new-session -A -s $session -x 120 -y 40"
+        ))
+        XCTAssertFalse(script.contains(executable))
+        XCTAssertFalse(script.contains(sessionName))
+    }
+
     func testSendAfterCloseFailsInsteadOfQueueingBytes() async {
         let server = SavedServer(displayName: "Closed Host", host: "example.com", username: "tester")
         let trustedHostStore = TrustedHostStore(
@@ -1396,6 +1425,13 @@ final class SSHTmuxControlTransportTests: XCTestCase {
         } catch {
             XCTFail("unexpected error: \(error)")
         }
+
+    }
+
+    private func decodePowerShellScript(_ command: String) throws -> String {
+        let encoded = try XCTUnwrap(command.split(separator: " ").last.map(String.init))
+        let data = try XCTUnwrap(Data(base64Encoded: encoded))
+        return try XCTUnwrap(String(data: data, encoding: .utf16LittleEndian))
     }
 
     private func makeSSHRootKey(

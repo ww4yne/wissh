@@ -122,6 +122,7 @@ final class WisshAppUITests: XCTestCase {
             app.swipeUp(velocity: .slow)
         }
         XCTAssertTrue(privateKeyImport.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["Multiplexer"].exists)
         privateKeyImport.tap()
         XCTAssertTrue(documentPicker.waitForExistence(timeout: 5))
         let cancelPrivateKeyPicker = documentPicker.buttons["Cancel"]
@@ -129,6 +130,33 @@ final class WisshAppUITests: XCTestCase {
         cancelPrivateKeyPicker.tap()
         XCTAssertTrue(waitForElementToDisappear(documentPicker, timeout: 3))
         attachScreenshot(named: "proxy-jump-custom-identity")
+    }
+
+    @MainActor
+    func testSelectsWindowsPsmuxMultiplexer() {
+        launchSimulatorApp()
+        openConnectionSetup()
+
+        let multiplexerPicker = app.descendants(matching: .any)[
+            "connection.multiplexer.type"
+        ]
+        for _ in 0..<8 where !multiplexerPicker.exists {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(multiplexerPicker.waitForExistence(timeout: 2))
+        multiplexerPicker.tap()
+
+        let psmux = app.buttons["psmux"]
+        XCTAssertTrue(psmux.waitForExistence(timeout: 2))
+        psmux.tap()
+
+        let executable = app.textFields["connection.tmux-executable"]
+        XCTAssertTrue(executable.waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            executable.value as? String,
+            "psmux.exe or C:\\path\\to\\psmux.exe"
+        )
+        XCTAssertTrue(app.staticTexts["Leave blank to use psmux.exe."].exists)
     }
 
     func testToolbarKeysUpdateRetainedSimulatorTerminalAndFirstSlotOpensShortcuts() {

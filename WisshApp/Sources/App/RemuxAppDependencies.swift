@@ -260,7 +260,9 @@ struct RemuxAppDependencies: Sendable {
                 connectTimeout: RemuxConnectionTimeouts.terminalSSHConnect
             ),
             controlNoResponseTimeout: RemuxConnectionTimeouts.tmuxControlNoResponse,
-            tmuxExecutable: target.server.tmuxExecutablePath ?? "tmux",
+            multiplexer: target.server.resolvedMultiplexer,
+            tmuxExecutable: target.server.tmuxExecutablePath
+                ?? target.server.resolvedMultiplexer.defaultExecutable,
             sessionName: target.workspace.sessionName,
             traceFlowID: traceFlowID,
             sshRootKey: RemuxSSHRootKey(target: target)
@@ -327,6 +329,7 @@ struct RemuxAppDependencies: Sendable {
             let claimedRoot = try await preparedRoot.claim(sshRoot, trace: trace)
             let sessions = try await TmuxSessionDiscovery.discover(
                 using: claimedRoot,
+                multiplexer: configuration.multiplexer,
                 tmuxExecutable: configuration.tmuxExecutable,
                 trace: trace
             )

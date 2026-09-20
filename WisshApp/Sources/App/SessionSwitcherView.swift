@@ -476,7 +476,7 @@ struct SessionSwitcherView<NewSessionContent: View>: View {
     private var discoveryStatusRows: some View {
         if isRefreshing {
             discoveryStatusRow(
-                "Looking for tmux sessions…",
+                "Looking for multiplexer sessions…",
                 systemImage: "arrow.clockwise"
             )
         } else if !failedServerNames.isEmpty {
@@ -487,7 +487,7 @@ struct SessionSwitcherView<NewSessionContent: View>: View {
         } else if projection.availableSessions.isEmpty,
                   hasUndiscoveredServer {
             discoveryStatusRow(
-                "Refresh to find tmux sessions",
+                "Refresh to find multiplexer sessions",
                 systemImage: "arrow.clockwise"
             )
         } else if projection.availableSessions.isEmpty {

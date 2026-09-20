@@ -1,6 +1,7 @@
 # Wissh
 
-Wissh is an iPhone SSH and tmux client with first-class ProxyJump support.
+Wissh is an iPhone SSH multiplexer client with first-class ProxyJump support.
+It supports tmux on POSIX hosts and psmux on Windows hosts.
 
 The project starts from the open-source
 [Remux](https://github.com/h3nock/remux) iOS tmux client and retains its
@@ -20,6 +21,8 @@ product identity before adding a single-server ProxyJump experience.
 - One client identity may be reused for both hops.
 - No private key is copied to or stored on the jump host.
 - Direct SSH remains available for servers that do not require a jump host.
+- OpenSSH private keys and unencrypted legacy PKCS#1 RSA PEM keys can be imported.
+- Server profiles can select tmux or Windows-native psmux control mode.
 - Native tmux workspace, SFTP, file preview, and localhost preview behavior
   remains compatible with upstream Remux where possible.
 

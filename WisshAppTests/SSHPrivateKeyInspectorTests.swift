@@ -95,6 +95,37 @@ final class SSHPrivateKeyInspectorTests: XCTestCase {
         }
     }
 
+    func testConvertsLegacyRSAPrivateKeyForAuthentication() throws {
+        let inspection = try SSHPrivateKeyInspector.inspect(Self.legacyRSAKey)
+
+        XCTAssertEqual(inspection.keyType, .rsa)
+        XCTAssertTrue(inspection.normalizedPEM.hasPrefix("-----BEGIN OPENSSH PRIVATE KEY-----"))
+        XCTAssertTrue(inspection.publicKeyLine.hasPrefix("ssh-rsa "))
+        _ = try SSHAuthenticationMethodFactory.make(
+            username: "demo",
+            credential: .privateKey(
+                SSHPrivateKeyCredential(privateKeyPEM: inspection.normalizedPEM)
+            )
+        )
+    }
+
+    func testExplainsUnsupportedLegacyPEMPrivateKeys() {
+        let legacyPKCS8 = """
+        -----BEGIN PRIVATE KEY-----
+        example
+        -----END PRIVATE KEY-----
+        """
+
+        XCTAssertThrowsError(try SSHPrivateKeyInspector.inspect(legacyPKCS8)) { error in
+            XCTAssertEqual(error as? SSHPrivateKeyInspectionError, .legacyPEMFormat)
+            XCTAssertEqual(
+                error.localizedDescription,
+                "This key uses legacy PEM format. "
+                    + "Convert a copy with ssh-keygen -p -o, then import it again."
+            )
+        }
+    }
+
     func testRejectsTruncatedPrivateKeyBlock() {
         let generated = SSHPrivateKeyInspector.generateEd25519(comment: "broken")
         let truncated = Self.privateKeyPEM(generated.privateKeyPEM) { payload in
@@ -320,6 +351,24 @@ final class SSHPrivateKeyInspectorTests: XCTestCase {
     Uy5fslboaiuQuwFBBnT1QDQQ0SoITS6MBvh0DFJVg76mR4vDLXGEmVo59CHxFZy7kR2GXu
     DfSvNOmwIetJ0+z9AAAADnJlbXV4LXRlc3QtcnNhAQIDBA==
     -----END OPENSSH PRIVATE KEY-----
+    """
+
+    private static let legacyRSAKey = """
+    -----BEGIN RSA PRIVATE KEY-----
+    MIICXgIBAAKBgQD18+tax3jwkM8c13/2MaTy1eRRL1bf0fvU274cN98qpQc9Hc5h
+    hU+eHAngwlRFPE6h82FEHBX3sh2EqJeHWZYLnx6vgJRxFiCGoBOq58zILyRH8rol
+    lDhUPDaR+sUj0qTLqMeH0wmQDGbKOZRzi9n81JaAyVyEAPxdPR5IF5TG3QIDAQAB
+    AoGBALGZ/S2ENNSh/Ky7AG/q0U15HnFxWa4tl0fRlaoSvlew61U6nLjW5vMpFAj0
+    yp1kOvO/J1FjZomCWMZeZ20ZR7qaMzKF1CrnhG2pjbTUkYYWzfQBCZOQBrDgbLSD
+    sX2gly/sULI3tsosCtCQs8t648LsEgqzUF8fViC5/eF5zC4RAkEA/m1kQyA6H3Yk
+    gjGkcYgaqBlHKCgKPg95KDS/RUbWjft64gmNDDyKWhZlNAp8ksXw39qg4qnX5A+o
+    4n++39lsawJBAPd5Hhj1JujoSI0rwUBKShPBT23zhKPvruBZNtN+mP19R38NRPim
+    R6fbhix8SdqYKLE3x+Wvm7D3LU9li1F+a9cCQCjfKdwesTecowDHOMOEOcQHS4cH
+    551QnwX2c0ONvanRXEwzfJUapJ8UOe3CQYDSi39qf63p2uSoH1lDbEZJh0ECQQDx
+    WDNcD6mUtwQaeTOMqWa5AWufRUB0SIn5zcfEVtCJVqZlZ+F9xVxYfaTKuaOlBYOZ
+    4VaXz708xrJvng5SucIdAkEAtuq2ZtBg42ZtDd+4mNjeGbuS0Chpjlg9cmHz8cK8
+    UtvjokqhC8DjXNlkHzbUf7zhyLl0eTvLxNkSfEo3ECfDcw==
+    -----END RSA PRIVATE KEY-----
     """
 
     private static let ecdsaP256Key = """

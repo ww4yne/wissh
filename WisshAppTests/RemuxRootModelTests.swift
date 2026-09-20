@@ -1372,7 +1372,9 @@ final class RemuxRootModelTests: XCTestCase {
         XCTAssertEqual(setup.draft.displayName, "Example Server")
         XCTAssertEqual(
             setup.submissionIssue,
-            .verificationFailed("Install tmux on this server or update Executable Path.")
+            .verificationFailed(
+                "Install the selected multiplexer on this server or update Executable."
+            )
         )
         let snapshot = try await harness.profileRepository.loadSnapshot()
         let credentials = await harness.credentialStore.credentialsSnapshot()

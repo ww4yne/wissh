@@ -267,6 +267,23 @@ final class ConnectionProfileRepositoryTests: XCTestCase {
         XCTAssertEqual(decoded.tmuxExecutablePath, "/home/deploy/.local/bin/tmux")
     }
 
+    func testSavedServerCodablePreservesPsmuxSelection() throws {
+        let server = SavedServer(
+            displayName: "Windows",
+            host: "windows.example.test",
+            username: "deploy",
+            identityID: UUID(),
+            multiplexer: .psmux,
+            tmuxExecutablePath: #"C:\Tools\psmux.exe"#
+        )
+
+        let encoded = try JSONEncoder().encode(server)
+        let decoded = try JSONDecoder().decode(SavedServer.self, from: encoded)
+
+        XCTAssertEqual(decoded, server)
+        XCTAssertEqual(decoded.resolvedMultiplexer, .psmux)
+    }
+
     func testSavedServerDecodesMissingTmuxExecutablePathAsDefault() throws {
         let id = UUID()
         let identityID = UUID()
@@ -285,6 +302,7 @@ final class ConnectionProfileRepositoryTests: XCTestCase {
 
         let server = try JSONDecoder().decode(SavedServer.self, from: data)
 
+        XCTAssertEqual(server.resolvedMultiplexer, .tmux)
         XCTAssertNil(server.tmuxExecutablePath)
     }
 

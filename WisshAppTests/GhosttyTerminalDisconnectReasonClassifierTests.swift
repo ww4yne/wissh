@@ -82,12 +82,12 @@ final class GhosttyTerminalDisconnectReasonClassifierTests: XCTestCase {
             (
                 127,
                 SSHTmuxControlCommandBuilder.tmuxNotFoundMarker,
-                "Install tmux on this server or update Executable Path."
+                "Install the selected multiplexer on this server or update Executable."
             ),
             (
                 126,
                 SSHTmuxControlCommandBuilder.tmuxNotExecutableMarker,
-                "Check the tmux executable and its permissions, then try again."
+                "Check the multiplexer executable and its permissions, then try again."
             ),
         ]
 
@@ -178,7 +178,7 @@ final class GhosttyTerminalDisconnectReasonClassifierTests: XCTestCase {
             GhosttyTerminalDisconnectReasonClassifier.foregroundMissingHost(),
             TerminalDisconnectReason(
                 kind: .transportIO,
-                message: "tmux transport unavailable after foreground"
+                message: "Multiplexer transport unavailable after foreground"
             )
         )
     }

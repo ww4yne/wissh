@@ -1640,7 +1640,7 @@ private struct LibraryEmptyState: View {
                 Image(systemName: "server.rack")
             }
         } description: {
-            Text("Add an SSH server to start using tmux sessions from this phone.")
+            Text("Add an SSH server to start using multiplexer sessions from this phone.")
         } actions: {
             LibraryEmptyAddServerButton(action: onAddServer)
         }
@@ -2522,9 +2522,18 @@ struct ConnectionSetupView: View {
 
             if showsEditableServerFields {
                 Section {
+                    Picker("Type", selection: multiplexerBinding) {
+                        ForEach(TerminalMultiplexer.allCases) { multiplexer in
+                            Text(multiplexer.displayName).tag(multiplexer)
+                        }
+                    }
+                    .accessibilityIdentifier("connection.multiplexer.type")
+
                     tmuxExecutableInputRow()
                 } header: {
-                    Text("tmux")
+                    Text("Multiplexer")
+                } footer: {
+                    Text("Leave blank to use \(draft.multiplexer.defaultExecutable).")
                 }
                 .connectionSetupListRowSurface(usesLibraryChrome: showsEditableServerFields)
             } else if showsSessionFields {
@@ -2818,7 +2827,7 @@ struct ConnectionSetupView: View {
     private var sessionSectionFooter: String {
         switch mode {
         case .newWorkspace:
-            "Names a tmux session on this server. Reuse a name to attach to an existing session."
+            "Names a multiplexer session on this server. Reuse a name to attach to an existing session."
         case .editWorkspace:
             "Renaming applies the next time you connect."
         case .newServer, .editServer:
@@ -2880,8 +2889,10 @@ struct ConnectionSetupView: View {
 
     private func tmuxExecutableInputRow() -> some View {
         textInputRow(
-            title: "Executable Path (Optional)",
-            placeholder: "/absolute/path/to/tmux",
+            title: "Executable (Optional)",
+            placeholder: draft.multiplexer == .tmux
+                ? "/absolute/path/to/tmux"
+                : "psmux.exe or C:\\path\\to\\psmux.exe",
             keyPath: \.tmuxExecutablePath,
             field: .tmuxExecutablePath,
             validationMessage: validation.tmuxExecutablePath,
@@ -2968,6 +2979,18 @@ struct ConnectionSetupView: View {
                 publicKeyCopyMessage = nil
                 onChange { draft in
                     draft.authenticationKind = newValue
+                }
+            }
+        )
+    }
+
+    private var multiplexerBinding: Binding<TerminalMultiplexer> {
+        Binding(
+            get: { draft.multiplexer },
+            set: { multiplexer in
+                onChange { draft in
+                    draft.multiplexer = multiplexer
+                    draft.tmuxExecutablePath = ""
                 }
             }
         )

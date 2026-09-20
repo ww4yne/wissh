@@ -1802,13 +1802,13 @@ final class RemuxRootModel: ObservableObject {
                stderr.localizedCaseInsensitiveContains(
                    SSHTmuxControlCommandBuilder.tmuxNotFoundMarker
                ) {
-                return "Install tmux on this server or update Executable Path."
+                return "Install the selected multiplexer on this server or update Executable."
             }
             if status == 126,
                stderr.localizedCaseInsensitiveContains(
                    SSHTmuxControlCommandBuilder.tmuxNotExecutableMarker
                ) {
-                return "Check the tmux executable and its permissions, then try again."
+                return "Check the multiplexer executable and its permissions, then try again."
             }
             return discoveryError.localizedDescription
         }
