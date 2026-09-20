@@ -1445,7 +1445,7 @@ final class SSHTmuxControlTransportTests: XCTestCase {
             "& $resolved new-session -A -d -s $session -x 120 -y 40"
         ))
         XCTAssertTrue(script.contains(
-            "& $resolved resize-window -x 120 -y 40 -t $session"
+            "& $resolved set-option -w -t $session window-size latest"
         ))
         XCTAssertTrue(script.contains("$env:PSMUX_SESSION_NAME=$session"))
         XCTAssertTrue(script.contains("& $resolved -CC"))

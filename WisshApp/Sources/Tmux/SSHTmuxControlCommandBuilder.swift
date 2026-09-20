@@ -100,7 +100,7 @@ enum SSHTmuxControlCommandBuilder {
         if(-not $resolved){[Console]::Error.WriteLine('\(tmuxNotFoundMarker): '+$exe);exit 127};\
         try{& $resolved new-session -A -d -s $session -x \(initialViewport.columns) -y \(initialViewport.rows);\
         if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};\
-        & $resolved resize-window -x \(initialViewport.columns) -y \(initialViewport.rows) -t $session;\
+        & $resolved set-option -w -t $session window-size latest;\
         if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};\
         $env:PSMUX_SESSION_NAME=$session;\
         & $resolved -CC;\

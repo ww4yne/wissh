@@ -88,11 +88,10 @@ extension GhosttyTerminalResponderUIView: UITextInput {
         }
 
         if let markedTextStorage {
-            return (markedTextStorage as NSString).substring(
-                with: NSRange(
-                    location: range.from.offset,
-                    length: range.to.offset - range.from.offset
-                )
+            let utf16 = Array(markedTextStorage.utf16)
+            return String(
+                decoding: utf16[range.from.offset..<range.to.offset],
+                as: UTF16.self
             )
         }
 
@@ -115,7 +114,10 @@ extension GhosttyTerminalResponderUIView: UITextInput {
 
         inputDelegate?.textWillChange(self)
         inputDelegate?.selectionWillChange(self)
-        markedTextStorage = markedText
+        // UIKit may bridge marked text from a mutable NSString. Keep an
+        // independent Swift-native copy because the keyboard can mutate its
+        // source while querying this UITextInput implementation.
+        markedTextStorage = String(decoding: Array(markedText.utf8), as: UTF8.self)
         let length = markedText.utf16.count
         let location = max(0, min(selectedRange.location, length))
         self.markedTextSelection = NSRange(
