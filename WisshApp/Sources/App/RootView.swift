@@ -2213,6 +2213,59 @@ private struct PendingProxyJumpIdentityImport {
     let inspection: SSHPrivateKeyInspection
 }
 
+private enum PrivateKeyImportPurpose {
+    case target
+    case proxyJump
+}
+
+private struct PrivateKeyDocumentPicker: UIViewControllerRepresentable {
+    let onPick: ([URL]) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick, onCancel: onCancel)
+    }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(
+            forOpeningContentTypes: [.item],
+            asCopy: true
+        )
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIDocumentPickerViewController,
+        context: Context
+    ) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let onPick: ([URL]) -> Void
+        private let onCancel: () -> Void
+
+        init(
+            onPick: @escaping ([URL]) -> Void,
+            onCancel: @escaping () -> Void
+        ) {
+            self.onPick = onPick
+            self.onCancel = onCancel
+        }
+
+        func documentPicker(
+            _ controller: UIDocumentPickerViewController,
+            didPickDocumentsAt urls: [URL]
+        ) {
+            onPick(urls)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            onCancel()
+        }
+    }
+}
+
 struct ConnectionSetupView: View {
     let draft: TmuxConnectionDraft
     let validation: TmuxConnectionDraftValidation
@@ -2256,7 +2309,7 @@ struct ConnectionSetupView: View {
     @State private var proxyJumpIdentityImportError: String?
     @State private var pendingProxyJumpIdentityImport: PendingProxyJumpIdentityImport?
     @State private var proxyJumpIdentityPassphrase = ""
-    @State private var isProxyJumpIdentityImporterPresented = false
+    @State private var privateKeyImportPurpose: PrivateKeyImportPurpose?
     @State private var isImportingProxyJumpIdentity = false
     @State private var publicKeyCopyMessage: String?
     @State private var publicKeyInstallRequest: SSHPublicKeyInstallRequest?
@@ -2369,7 +2422,8 @@ struct ConnectionSetupView: View {
                         Button {
                             dismissKeyboard()
                             proxyJumpIdentityImportError = nil
-                            isProxyJumpIdentityImporterPresented = true
+                            privateKeyImportPurpose = .proxyJump
+                            isPrivateKeyImporterPresented = true
                         } label: {
                             Label("Import Custom Key…", systemImage: "key.horizontal")
                         }
@@ -2519,18 +2573,18 @@ struct ConnectionSetupView: View {
                 }
             }
         }
-        .fileImporter(
-            isPresented: $isPrivateKeyImporterPresented,
-            allowedContentTypes: [.item],
-            allowsMultipleSelection: false,
-            onCompletion: handlePrivateKeyImport
-        )
-        .fileImporter(
-            isPresented: $isProxyJumpIdentityImporterPresented,
-            allowedContentTypes: [.item],
-            allowsMultipleSelection: false,
-            onCompletion: handleProxyJumpIdentityImport
-        )
+        .sheet(isPresented: $isPrivateKeyImporterPresented) {
+            PrivateKeyDocumentPicker(
+                onPick: { urls in
+                    handlePrivateKeyImportSelection(.success(urls))
+                    isPrivateKeyImporterPresented = false
+                },
+                onCancel: {
+                    privateKeyImportPurpose = nil
+                    isPrivateKeyImporterPresented = false
+                }
+            )
+        }
         .navigationDestination(isPresented: publicKeyInstallIsPresented) {
             if let request = publicKeyInstallRequest {
                 SSHPublicKeyInstallSheet(
@@ -3269,7 +3323,20 @@ struct ConnectionSetupView: View {
     private func presentPrivateKeyImporter() {
         privateKeyImportError = nil
         dismissKeyboard()
+        privateKeyImportPurpose = .target
         isPrivateKeyImporterPresented = true
+    }
+
+    private func handlePrivateKeyImportSelection(_ result: Result<[URL], Error>) {
+        defer { privateKeyImportPurpose = nil }
+        switch privateKeyImportPurpose {
+        case .target:
+            handlePrivateKeyImport(result)
+        case .proxyJump:
+            handleProxyJumpIdentityImport(result)
+        case nil:
+            break
+        }
     }
 
     private func handlePrivateKeyImport(_ result: Result<[URL], Error>) {

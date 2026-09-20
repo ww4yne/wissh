@@ -100,12 +100,34 @@ final class WisshAppUITests: XCTestCase {
             app.swipeUp(velocity: .slow)
         }
         XCTAssertTrue(identityImport.waitForExistence(timeout: 2))
+        XCTAssertTrue(identityImport.isHittable)
+        identityImport.tap()
+        let documentPicker = app.otherElements["Browse View (Picker)"]
+        XCTAssertTrue(documentPicker.waitForExistence(timeout: 5))
+        let cancelDocumentPicker = documentPicker.buttons["Cancel"]
+        XCTAssertTrue(cancelDocumentPicker.waitForExistence(timeout: 5))
+        cancelDocumentPicker.tap()
+        XCTAssertTrue(waitForElementToDisappear(documentPicker, timeout: 3))
         for _ in 0..<4 where !app.buttons["Private Key"].exists {
             app.swipeUp(velocity: .slow)
         }
         XCTAssertTrue(app.buttons["Password"].exists)
-        XCTAssertTrue(app.buttons["Private Key"].exists)
+        let privateKeyAuthentication = app.buttons["Private Key"]
+        XCTAssertTrue(privateKeyAuthentication.exists)
         XCTAssertFalse(app.buttons["Tailscale SSH"].exists)
+        privateKeyAuthentication.tap()
+
+        let privateKeyImport = app.buttons["connection.private-key.import"]
+        for _ in 0..<4 where !privateKeyImport.exists {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(privateKeyImport.waitForExistence(timeout: 2))
+        privateKeyImport.tap()
+        XCTAssertTrue(documentPicker.waitForExistence(timeout: 5))
+        let cancelPrivateKeyPicker = documentPicker.buttons["Cancel"]
+        XCTAssertTrue(cancelPrivateKeyPicker.waitForExistence(timeout: 2))
+        cancelPrivateKeyPicker.tap()
+        XCTAssertTrue(waitForElementToDisappear(documentPicker, timeout: 3))
         attachScreenshot(named: "proxy-jump-custom-identity")
     }
 
