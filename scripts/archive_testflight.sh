@@ -8,6 +8,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+team_id="${WISSH_DEVELOPMENT_TEAM:-NLCK9L8N9G}"
 upload=0
 if [[ "${1:-}" == "--upload" ]]; then
   upload=1
@@ -19,6 +20,7 @@ fi
 archive_path=".local/archives/Wissh-$(date +%Y%m%d-%H%M%S).xcarchive"
 export_path=".local/archives/export-$(date +%Y%m%d-%H%M%S)"
 export_options="$(mktemp -t wissh-export-options).plist"
+trap 'rm -f "$export_options"' EXIT
 
 destination="export"
 if [[ "$upload" -eq 1 ]]; then
@@ -35,7 +37,7 @@ cat >"$export_options" <<PLIST
 	<key>destination</key>
 	<string>${destination}</string>
 	<key>teamID</key>
-	<string>T37P2TW58H</string>
+	<string>${team_id}</string>
 </dict>
 </plist>
 PLIST
@@ -49,15 +51,13 @@ xcodebuild archive \
   -destination 'generic/platform=iOS' \
   -archivePath "$archive_path" \
   -allowProvisioningUpdates \
-  DEVELOPMENT_TEAM=T37P2TW58H
+  DEVELOPMENT_TEAM="$team_id"
 
 xcodebuild -exportArchive \
   -archivePath "$archive_path" \
   -exportOptionsPlist "$export_options" \
   -exportPath "$export_path" \
   -allowProvisioningUpdates
-
-rm -f "$export_options"
 
 if [[ "$upload" -eq 1 ]]; then
   echo "Uploaded to App Store Connect. Manage the build in TestFlight."
