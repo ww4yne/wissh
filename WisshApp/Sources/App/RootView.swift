@@ -2373,10 +2373,28 @@ struct ConnectionSetupView: View {
                 .connectionSetupListRowSurface(usesLibraryChrome: showsEditableServerFields)
 
                 Section {
-                    Toggle("ProxyJump", isOn: proxyJumpBinding)
-                        .toggleStyle(.switch)
-                        .tint(LibraryHomePalette.controlAccent)
-                        .accessibilityIdentifier("connection.proxy-jump.enabled")
+                    Toggle(isOn: proxyJumpBinding) {
+                        HStack {
+                            Text("ProxyJump")
+                            Spacer()
+                            Text(draft.usesProxyJump ? "ON" : "OFF")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(
+                                    draft.usesProxyJump ? Color.white : Color.secondary
+                                )
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(
+                                    draft.usesProxyJump
+                                        ? Color.green
+                                        : Color.secondary.opacity(0.16),
+                                    in: Capsule()
+                                )
+                        }
+                    }
+                    .toggleStyle(.switch)
+                    .tint(.green)
+                    .accessibilityIdentifier("connection.proxy-jump.enabled")
 
                     if draft.usesProxyJump {
                         textInputRow(

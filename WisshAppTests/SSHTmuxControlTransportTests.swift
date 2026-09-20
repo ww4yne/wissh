@@ -1331,6 +1331,56 @@ final class SSHTmuxControlTransportTests: XCTestCase {
         XCTAssertNoThrow(try promise.futureResult.wait())
     }
 
+    func testPsmuxFramingFilterRemovesDeviceControlWrapper() {
+        let filter = PsmuxControlModeFramingFilter()
+        let payload = Data(
+            "\u{1b}P1000p%begin 1 1 0\n%end 1 1 0\n%window-add @1\n\u{1b}\\"
+                .utf8
+        )
+
+        XCTAssertEqual(
+            filter.process(payload),
+            Data("%begin 1 1 0\n%end 1 1 0\n%window-add @1\n".utf8)
+        )
+    }
+
+    func testPsmuxFramingFilterHandlesSplitWrapperBoundaries() {
+        let filter = PsmuxControlModeFramingFilter()
+
+        XCTAssertEqual(filter.process(Data([0x1b, 0x50, 0x31])), Data())
+        XCTAssertEqual(
+            filter.process(Data("000p%begin 1 1 0\n".utf8)),
+            Data("%begin 1 1 0\n".utf8)
+        )
+        XCTAssertEqual(filter.process(Data("%exit\n\u{1b}".utf8)), Data("%exit\n".utf8))
+        XCTAssertEqual(filter.process(Data([0x5c])), Data())
+    }
+
+    func testPsmuxCommandAdapterWrapsInputCommands() {
+        let commands = Data(
+            "select-window -t @1\nsend-keys -H -t %2 61 62\nsend -t %2 Enter\n".utf8
+        )
+
+        XCTAssertEqual(
+            String(
+                data: PsmuxControlCommandAdapter.adapt(commands),
+                encoding: .utf8
+            ),
+            """
+            select-window -t @1
+            run-command send-keys -H -t %2 61 62
+            run-command send -t %2 Enter
+
+            """
+        )
+    }
+
+    func testPsmuxCommandAdapterPreservesNonUTF8Bytes() {
+        let data = Data([0xff, 0x00])
+
+        XCTAssertEqual(PsmuxControlCommandAdapter.adapt(data), data)
+    }
+
     func testControlSessionCommandDelegatesStartupToPOSIXShell() {
         let command = SSHTmuxControlCommandBuilder.attachOrCreateControlSessionCommand(
             tmuxExecutable: "tmux",
@@ -1392,8 +1442,13 @@ final class SSHTmuxControlTransportTests: XCTestCase {
         XCTAssertFalse(command.contains(executable))
         XCTAssertFalse(command.contains(sessionName))
         XCTAssertTrue(script.contains(
-            "& $resolved -C new-session -A -s $session -x 120 -y 40"
+            "& $resolved new-session -A -d -s $session -x 120 -y 40"
         ))
+        XCTAssertTrue(script.contains(
+            "& $resolved resize-window -x 120 -y 40 -t $session"
+        ))
+        XCTAssertTrue(script.contains("$env:PSMUX_SESSION_NAME=$session"))
+        XCTAssertTrue(script.contains("& $resolved -CC"))
         XCTAssertFalse(script.contains(executable))
         XCTAssertFalse(script.contains(sessionName))
     }

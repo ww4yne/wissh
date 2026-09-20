@@ -135,6 +135,8 @@ final class GhosttyTerminalResponderUIView: UIView, UIKeyInput, UITextInputTrait
     private var firstResponderStateHandler: ((Bool) -> Void)?
     private var lastReportedFirstResponderState: Bool?
     private let trackpadDriver: GhosttyKeyboardCursorTrackpadDriver
+    var markedTextStorage: String?
+    var markedTextSelection = NSRange(location: 0, length: 0)
     lazy var floatingCursorTokenizer: UITextInputTokenizer =
         UITextInputStringTokenizer(textInput: self)
     weak var inputDelegate: UITextInputDelegate?
@@ -220,7 +222,13 @@ final class GhosttyTerminalResponderUIView: UIView, UIKeyInput, UITextInputTrait
     }
 
     func insertText(_ text: String) {
+        clearMarkedText()
         submitTextInput(text, source: "insertText")
+    }
+
+    func clearMarkedText() {
+        markedTextStorage = nil
+        markedTextSelection = NSRange(location: 0, length: 0)
     }
 
     func submitTextInput(_ text: String, source: String) {

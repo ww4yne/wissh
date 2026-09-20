@@ -38,20 +38,39 @@ final class GhosttyVirtualTextRange: UITextRange {
 extension GhosttyTerminalResponderUIView: UITextInput {
     var selectedTextRange: UITextRange? {
         get {
-            let end = GhosttyVirtualTextPosition(offset: 1)
-            return GhosttyVirtualTextRange(from: end, to: end)
+            guard markedTextStorage != nil else {
+                let end = GhosttyVirtualTextPosition(offset: virtualDocumentLength)
+                return GhosttyVirtualTextRange(from: end, to: end)
+            }
+            let startOffset = min(markedTextSelection.location, virtualDocumentLength)
+            let endOffset = min(
+                startOffset + markedTextSelection.length,
+                virtualDocumentLength
+            )
+            return GhosttyVirtualTextRange(
+                from: GhosttyVirtualTextPosition(offset: startOffset),
+                to: GhosttyVirtualTextPosition(offset: endOffset)
+            )
         }
         set { _ = newValue }
     }
 
-    var markedTextRange: UITextRange? { nil }
+    var markedTextRange: UITextRange? {
+        guard markedTextStorage != nil else { return nil }
+        return GhosttyVirtualTextRange(
+            from: GhosttyVirtualTextPosition(offset: 0),
+            to: GhosttyVirtualTextPosition(offset: virtualDocumentLength)
+        )
+    }
     var markedTextStyle: [NSAttributedString.Key: Any]? {
         get { nil }
         set { _ = newValue }
     }
 
     var beginningOfDocument: UITextPosition { GhosttyVirtualTextPosition(offset: 0) }
-    var endOfDocument: UITextPosition { GhosttyVirtualTextPosition(offset: 1) }
+    var endOfDocument: UITextPosition {
+        GhosttyVirtualTextPosition(offset: virtualDocumentLength)
+    }
     var tokenizer: UITextInputTokenizer { floatingCursorTokenizer }
     var selectionAffinity: UITextStorageDirection {
         get { .forward }
@@ -63,9 +82,18 @@ extension GhosttyTerminalResponderUIView: UITextInput {
             let range = range as? GhosttyVirtualTextRange,
             range.from.offset >= 0,
             range.from.offset <= range.to.offset,
-            range.to.offset <= 1
+            range.to.offset <= virtualDocumentLength
         else {
             return nil
+        }
+
+        if let markedTextStorage {
+            return (markedTextStorage as NSString).substring(
+                with: NSRange(
+                    location: range.from.offset,
+                    length: range.to.offset - range.from.offset
+                )
+            )
         }
 
         // Keep the virtual document coherent so UIKit sees one deletable
@@ -75,14 +103,38 @@ extension GhosttyTerminalResponderUIView: UITextInput {
 
     func replace(_ range: UITextRange, withText text: String) {
         _ = range
+        clearMarkedText()
         submitTextInput(text, source: "replaceText")
     }
 
     func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
-        _ = (markedText, selectedRange)
+        guard let markedText else {
+            unmarkText()
+            return
+        }
+
+        inputDelegate?.textWillChange(self)
+        inputDelegate?.selectionWillChange(self)
+        markedTextStorage = markedText
+        let length = markedText.utf16.count
+        let location = max(0, min(selectedRange.location, length))
+        self.markedTextSelection = NSRange(
+            location: location,
+            length: max(0, min(selectedRange.length, length - location))
+        )
+        inputDelegate?.textDidChange(self)
+        inputDelegate?.selectionDidChange(self)
     }
 
-    func unmarkText() {}
+    func unmarkText() {
+        guard let markedTextStorage else { return }
+        inputDelegate?.textWillChange(self)
+        inputDelegate?.selectionWillChange(self)
+        clearMarkedText()
+        inputDelegate?.textDidChange(self)
+        inputDelegate?.selectionDidChange(self)
+        submitTextInput(markedTextStorage, source: "unmarkText")
+    }
 
     func textRange(from fromPosition: UITextPosition, to toPosition: UITextPosition) -> UITextRange? {
         guard
@@ -96,7 +148,7 @@ extension GhosttyTerminalResponderUIView: UITextInput {
 
     func position(from position: UITextPosition, offset: Int) -> UITextPosition? {
         guard let position = position as? GhosttyVirtualTextPosition else { return nil }
-        let next = max(0, min(1, position.offset + offset))
+        let next = max(0, min(virtualDocumentLength, position.offset + offset))
         return GhosttyVirtualTextPosition(offset: next)
     }
 
@@ -173,12 +225,16 @@ extension GhosttyTerminalResponderUIView: UITextInput {
 
     func closestPosition(to point: CGPoint) -> UITextPosition? {
         _ = point
-        return GhosttyVirtualTextPosition(offset: 0)
+        return GhosttyVirtualTextPosition(offset: virtualDocumentLength)
     }
 
     func closestPosition(to point: CGPoint, within range: UITextRange) -> UITextPosition? {
         _ = (point, range)
         return GhosttyVirtualTextPosition(offset: 0)
+    }
+
+    private var virtualDocumentLength: Int {
+        max(1, markedTextStorage?.utf16.count ?? 0)
     }
 
     func characterRange(at point: CGPoint) -> UITextRange? {

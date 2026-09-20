@@ -108,6 +108,61 @@ final class GhosttyTerminalResponderViewTests: XCTestCase {
     }
 
     @MainActor
+    func testMarkedTextWaitsForCommitAndExposesCompositionRange() throws {
+        let view = GhosttyTerminalResponderUIView(trackpadDriver: GhosttyKeyboardCursorTrackpadDriver())
+        var receivedText: [String] = []
+        view.update(
+            isEnabled: true,
+            wantsFirstResponder: true,
+            activationToken: 1,
+            sendText: {
+                receivedText.append($0)
+                return true
+            },
+            sendPaste: { _ in true },
+            sendKeyEvent: { _ in true }
+        )
+
+        view.setMarkedText("zhong", selectedRange: NSRange(location: 5, length: 0))
+        view.setMarkedText("中", selectedRange: NSRange(location: 1, length: 0))
+
+        let markedRange = try XCTUnwrap(
+            view.markedTextRange as? GhosttyVirtualTextRange
+        )
+        XCTAssertEqual(view.text(in: markedRange), "中")
+        XCTAssertTrue(receivedText.isEmpty)
+
+        view.unmarkText()
+
+        XCTAssertEqual(receivedText, ["中"])
+        XCTAssertNil(view.markedTextRange)
+    }
+
+    @MainActor
+    func testCommittedTextReplacesMarkedTextWithoutDuplicateInput() {
+        let view = GhosttyTerminalResponderUIView(trackpadDriver: GhosttyKeyboardCursorTrackpadDriver())
+        var receivedText: [String] = []
+        view.update(
+            isEnabled: true,
+            wantsFirstResponder: true,
+            activationToken: 1,
+            sendText: {
+                receivedText.append($0)
+                return true
+            },
+            sendPaste: { _ in true },
+            sendKeyEvent: { _ in true }
+        )
+
+        view.setMarkedText("zhong", selectedRange: NSRange(location: 5, length: 0))
+        view.insertText("中")
+        view.unmarkText()
+
+        XCTAssertEqual(receivedText, ["中"])
+        XCTAssertNil(view.markedTextRange)
+    }
+
+    @MainActor
     func testInsertTextIsIgnoredWhenDisabled() {
         let view = GhosttyTerminalResponderUIView(trackpadDriver: GhosttyKeyboardCursorTrackpadDriver())
         var receivedText: [String] = []

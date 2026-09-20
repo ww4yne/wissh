@@ -98,7 +98,13 @@ enum SSHTmuxControlCommandBuilder {
         $session=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('\(base64(sessionName))'));\
         $resolved=(Get-Command -Name $exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source);\
         if(-not $resolved){[Console]::Error.WriteLine('\(tmuxNotFoundMarker): '+$exe);exit 127};\
-        try{& $resolved -C new-session -A -s $session -x \(initialViewport.columns) -y \(initialViewport.rows);exit $LASTEXITCODE}\
+        try{& $resolved new-session -A -d -s $session -x \(initialViewport.columns) -y \(initialViewport.rows);\
+        if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};\
+        & $resolved resize-window -x \(initialViewport.columns) -y \(initialViewport.rows) -t $session;\
+        if($LASTEXITCODE -ne 0){exit $LASTEXITCODE};\
+        $env:PSMUX_SESSION_NAME=$session;\
+        & $resolved -CC;\
+        exit $LASTEXITCODE}\
         catch{[Console]::Error.WriteLine('\(tmuxNotExecutableMarker): '+$exe);exit 126}
         """
     }

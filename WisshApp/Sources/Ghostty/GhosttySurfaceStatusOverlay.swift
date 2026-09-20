@@ -220,7 +220,7 @@ struct GhosttySurfaceStatusOverlay: View {
         }
 
         if reason?.kind == .tmuxUnavailable {
-            return "tmux Unavailable"
+            return "Multiplexer Unavailable"
         }
 
         return "Disconnected"
@@ -240,7 +240,7 @@ struct GhosttySurfaceStatusOverlay: View {
         }
 
         if reason?.kind == .tmuxUnavailable {
-            return "TMUX"
+            return "MULTIPLEXER"
         }
 
         return "TERMINAL"

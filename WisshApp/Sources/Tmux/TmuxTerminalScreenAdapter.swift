@@ -454,7 +454,7 @@ final class TmuxTerminalScreenAdapter: ObservableObject {
 
     private func presentCommandFailure(for request: TmuxSessionController.Request) {
         commandFailureToken &+= 1
-        let message = "tmux: \(Self.failureLabel(for: request)) failed"
+        let message = "Multiplexer: \(Self.failureLabel(for: request)) failed"
         commandFailureMessage = message
         commandFailureEvent = GhosttyTmuxCommandFailureEvent(
             token: commandFailureToken,
@@ -1048,7 +1048,7 @@ extension TmuxSessionController.DetachReason {
         case .serverExited(let message):
             TerminalDisconnectReason(
                 kind: .remoteExit,
-                message: message ?? "tmux server exited"
+                message: message ?? "multiplexer server exited"
             )
         case .transportClosed:
             TerminalDisconnectReason(
@@ -1058,12 +1058,12 @@ extension TmuxSessionController.DetachReason {
         case .channelAborted:
             TerminalDisconnectReason(
                 kind: .runtime,
-                message: "tmux control protocol error"
+                message: "multiplexer control protocol error"
             )
         case .outOfMemory:
             TerminalDisconnectReason(
                 kind: .runtime,
-                message: "tmux session sync failed"
+                message: "multiplexer session sync failed"
             )
         }
     }
@@ -1075,7 +1075,7 @@ extension TmuxSessionController.CloseReason {
         case .unsupportedVersion(let version):
             TerminalDisconnectReason(
                 kind: .runtime,
-                message: "unsupported tmux version \(version) (requires 3.1+)"
+                message: "unsupported multiplexer protocol version \(version)"
             )
         }
     }

@@ -134,13 +134,13 @@ final class TmuxSessionController: @unchecked Sendable {
             case .paneUnavailable:
                 return "The originating terminal pane is no longer available."
             case .commandSkipped:
-                return "tmux did not execute the current-directory query."
+                return "The multiplexer did not execute the current-directory query."
             case .commandFailed(let detail):
                 return detail.isEmpty
-                    ? "tmux could not resolve the terminal's current directory."
+                    ? "The multiplexer could not resolve the terminal's current directory."
                     : detail
             case .invalidResponse:
-                return "tmux returned an invalid current directory."
+                return "The multiplexer returned an invalid current directory."
             }
         }
     }

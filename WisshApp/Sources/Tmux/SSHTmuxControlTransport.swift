@@ -163,6 +163,87 @@ final class SSHTmuxControlFirstOutputGate: @unchecked Sendable {
     }
 }
 
+final class PsmuxControlModeFramingFilter: @unchecked Sendable {
+    private static let deviceControlPrefix = Data([0x1b, 0x50, 0x31, 0x30, 0x30, 0x30, 0x70])
+    private static let stringTerminator = Data([0x1b, 0x5c])
+
+    private let lock = NIOLock()
+    private var prefixBuffer = Data()
+    private var didResolvePrefix = false
+    private var hasPendingEscape = false
+
+    func process(_ data: Data) -> Data {
+        lock.withLock {
+            var input = data
+            if !didResolvePrefix {
+                prefixBuffer.append(input)
+                if Self.deviceControlPrefix.starts(with: prefixBuffer),
+                   prefixBuffer.count < Self.deviceControlPrefix.count {
+                    return Data()
+                }
+
+                didResolvePrefix = true
+                if prefixBuffer.starts(with: Self.deviceControlPrefix) {
+                    prefixBuffer.removeFirst(Self.deviceControlPrefix.count)
+                }
+                input = prefixBuffer
+                prefixBuffer.removeAll(keepingCapacity: false)
+            }
+
+            var output = Data()
+            var index = input.startIndex
+            if hasPendingEscape {
+                if index < input.endIndex, input[index] == Self.stringTerminator[1] {
+                    index = input.index(after: index)
+                } else {
+                    output.append(Self.stringTerminator[0])
+                }
+                hasPendingEscape = false
+            }
+
+            while index < input.endIndex {
+                let byte = input[index]
+                let nextIndex = input.index(after: index)
+                guard byte == Self.stringTerminator[0] else {
+                    output.append(byte)
+                    index = nextIndex
+                    continue
+                }
+
+                guard nextIndex < input.endIndex else {
+                    hasPendingEscape = true
+                    break
+                }
+                if input[nextIndex] == Self.stringTerminator[1] {
+                    index = input.index(after: nextIndex)
+                } else {
+                    output.append(byte)
+                    index = nextIndex
+                }
+            }
+            return output
+        }
+    }
+}
+
+enum PsmuxControlCommandAdapter {
+    static func adapt(_ data: Data) -> Data {
+        guard let commandText = String(data: data, encoding: .utf8) else {
+            return data
+        }
+
+        let lines = commandText.split(separator: "\n", omittingEmptySubsequences: false)
+        let adapted = lines.map { line -> String in
+            let text = String(line)
+            if text.hasPrefix("send-keys ") || text.hasPrefix("send ") {
+                return "run-command \(text)"
+            }
+            return text
+        }
+        return Data(adapted.joined(separator: "\n").utf8)
+    }
+}
+
 enum SSHTmuxControlTransportError: LocalizedError, Equatable, CustomStringConvertible {
     case remoteExit(Int, diagnostics: SSHTmuxStartupDiagnostics? = nil)
     case channelRequestFailed(SSHTmuxControlChannelRequestKind, diagnostics: SSHTmuxStartupDiagnostics? = nil)
@@ -193,26 +274,26 @@ enum SSHTmuxControlTransportError: LocalizedError, Equatable, CustomStringConver
         case .stalePreparedConnection:
             return "stalePreparedConnection"
         case .controlSessionNoResponse(let timeout):
-            return "tmux control session produced no output within \(timeout)"
+            return "multiplexer control session produced no output within \(timeout)"
         }
     }
 
     var errorDescription: String? {
         switch self {
         case .remoteExit(let code, _):
-            return "The remote tmux control session exited with status \(code)."
+            return "The remote multiplexer control session exited with status \(code)."
         case .channelRequestFailed(let request, _):
             return "The SSH server rejected the \(request.description) request."
         case .unsupportedInboundChannel:
             return "Wissh received an unexpected SSH channel type."
         case .alreadyStarted:
-            return "The tmux control transport has already started."
+            return "The multiplexer control transport has already started."
         case .closed:
-            return "The tmux control transport has already been closed."
+            return "The multiplexer control transport has already been closed."
         case .stalePreparedConnection:
             return "The prepared SSH root reservation is no longer valid."
         case .controlSessionNoResponse(let timeout):
-            return "The remote tmux control session produced no output within \(timeout)."
+            return "The remote multiplexer control session produced no output within \(timeout)."
         }
     }
 
@@ -318,6 +399,9 @@ actor SSHTmuxControlTransport: TmuxControlTransport, TmuxControlTransportLivenes
                 await claimedConnection.release(.reusable)
                 throw SSHTmuxControlTransportError.closed
             }
+            let framingFilter = configuration.multiplexer == .psmux
+                ? PsmuxControlModeFramingFilter()
+                : nil
             establishedConnection = try await SSHTmuxControlBootstrap.openControlSession(
                 using: claimedConnection,
                 viewport: startupViewport,
@@ -325,7 +409,10 @@ actor SSHTmuxControlTransport: TmuxControlTransport, TmuxControlTransportLivenes
                 controlNoResponseTimeout: configuration.controlNoResponseTimeout,
                 trace: startupTrace,
                 onOutput: { [inboundStream] data in
-                    inboundStream.yield(data)
+                    let payload = framingFilter?.process(data) ?? data
+                    if !payload.isEmpty {
+                        inboundStream.yield(payload)
+                    }
                 },
                 onFinish: { [inboundStream] error in
                     inboundStream.finish(error)
@@ -406,22 +493,25 @@ actor SSHTmuxControlTransport: TmuxControlTransport, TmuxControlTransportLivenes
     func send(_ data: Data) async throws {
         guard !data.isEmpty else { return }
         guard !isClosed else { throw SSHTmuxControlTransportError.closed }
+        let payload = configuration.multiplexer == .psmux
+            ? PsmuxControlCommandAdapter.adapt(data)
+            : data
 
         let start = GhosttyRuntimeTrace.nowNanos()
         guard let connection else {
-            pendingWrites.append(data)
+            pendingWrites.append(payload)
             GhosttyRuntimeTrace.latency(
-                "transport.send queued-before-start bytes=\(data.count) pending=\(pendingWrites.count) elapsed_ms=\(GhosttyRuntimeTrace.elapsedMilliseconds(from: start)) preview=\(GhosttyRuntimeTrace.preview(data, limit: 160))"
+                "transport.send queued-before-start bytes=\(payload.count) pending=\(pendingWrites.count) elapsed_ms=\(GhosttyRuntimeTrace.elapsedMilliseconds(from: start)) preview=\(GhosttyRuntimeTrace.preview(payload, limit: 160))"
             )
             return
         }
 
         GhosttyRuntimeTrace.latency(
-            "transport.send begin bytes=\(data.count) preview=\(GhosttyRuntimeTrace.preview(data, limit: 160))"
+            "transport.send begin bytes=\(payload.count) preview=\(GhosttyRuntimeTrace.preview(payload, limit: 160))"
         )
-        try await connection.write(data)
+        try await connection.write(payload)
         GhosttyRuntimeTrace.latency(
-            "transport.send end bytes=\(data.count) elapsed_ms=\(GhosttyRuntimeTrace.elapsedMilliseconds(from: start))"
+            "transport.send end bytes=\(payload.count) elapsed_ms=\(GhosttyRuntimeTrace.elapsedMilliseconds(from: start))"
         )
     }
 
